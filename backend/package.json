@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "npx tsc",
     "start": "node dist/server.js",
     "smoke:production": "node scripts/smoke-production.mjs",
     "test": "tsx --test test/security.test.ts test/auth-contract.test.ts && tsc --noEmit",
