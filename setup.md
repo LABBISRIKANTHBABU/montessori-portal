@@ -163,7 +163,7 @@ In `frontend/src/api.ts`, update the API base URL:
 
 ```typescript
 const API_BASE = process.env.NODE_ENV === "production"
-  ? "https://api.montessorischools.in"
+  ? "https://api-v2.montessorischools.in"
   : "";
 ```
 
@@ -175,7 +175,7 @@ Then rebuild: `npm run build`
 
 Enable SSL in Hostinger control panel for:
 - `montessorischools.in`
-- `api.montessorischools.in`
+- `api-v2.montessorischools.in`
 
 ---
 

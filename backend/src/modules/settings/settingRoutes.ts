@@ -6,17 +6,16 @@
 import { Router } from "express";
 import multer from "multer";
 import { randomUUID } from "node:crypto";
-import { extname, resolve } from "node:path";
-import { mkdirSync } from "node:fs";
+import { extname } from "node:path";
 import { z } from "zod";
 import { getPool, query } from "../../database/pool.js";
 import { requirePermission } from "../../security/permissions.js";
 import type { AuthRequest } from "../../types/auth.js";
 import type { RowDataPacket } from "mysql2/promise";
+import { ensureStorageDirectory } from "../../storage/storageService.js";
 
 const router = Router();
-const settingsUploadDir = resolve(process.cwd(), "../uploads/settings");
-mkdirSync(settingsUploadDir, { recursive: true });
+const settingsUploadDir = ensureStorageDirectory("settings");
 
 const logoStorage = multer.diskStorage({
   destination: (_req, file, cb) => cb(null, settingsUploadDir),

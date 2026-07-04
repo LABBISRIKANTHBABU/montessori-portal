@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Search, Upload, ArrowRight, Download, Filter, MoreHorizontal, GraduationCap, Users, Trash2 } from "lucide-react";
-import { api, token, Student } from "../../api";
+import { api, Student } from "../../api";
 import { useDebounce } from "../../hooks/useDebounce";
 import Pagination from "../../components/Pagination";
 import EmptyState from "../../components/EmptyState";
@@ -64,8 +64,18 @@ export default function StudentsPage() {
     }
   }
 
-  function handleExport(format: "csv" | "xlsx") {
-    window.open(api.exportStudents(search, statusFilter, format), "_blank");
+  async function handleExport(format: "csv" | "xlsx") {
+    try {
+      const blob = await api.exportStudents(search, statusFilter, format);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `students.${format}`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Export failed.");
+    }
   }
 
   const hasSelection = selectedIds.length > 0;

@@ -196,10 +196,17 @@ export default function ImportPage() {
     }
   }
 
-  function downloadErrors(format: "csv" | "html") {
+  async function downloadErrors(format: "csv" | "html") {
     if (!selected) return;
     if (format === "html") {
-      window.open(api.viewErrorReport(selected.id), "_blank");
+      try {
+        const blob = await api.viewErrorReport(selected.id);
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank", "noopener,noreferrer");
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Could not open error report.");
+      }
     } else {
       api.downloadImportErrors(selected.id).then(blob => {
         const url = URL.createObjectURL(blob);

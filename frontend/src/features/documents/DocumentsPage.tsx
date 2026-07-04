@@ -96,8 +96,15 @@ export default function DocumentsPage() {
     } catch (err: any) { alert(err.message || "Download failed"); }
   }
 
-  function handlePreview(docId: number) {
-    window.open(api.previewDocument(docId), "_blank");
+  async function handlePreview(docId: number) {
+    try {
+      const blob = await api.previewDocument(docId);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err: any) {
+      alert(err.message || "Preview failed");
+    }
   }
 
   async function handleArchive(docId: number) {

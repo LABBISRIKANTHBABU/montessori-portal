@@ -5,6 +5,9 @@
 **Application type:** Multi-school student administration portal  
 **Primary stack:** React, TypeScript, Express and Hostinger MySQL
 
+Production deployment instructions are maintained in [PRODUCTION_DEPLOYMENT_VERCEL_HOSTINGER.md](./PRODUCTION_DEPLOYMENT_VERCEL_HOSTINGER.md).
+The full module persistence, operations, backup, recovery, and acceptance guide is [END_TO_END_PRODUCTION_OPERATIONS.md](./END_TO_END_PRODUCTION_OPERATIONS.md).
+
 ---
 
 ## 1. Purpose of this document
@@ -441,6 +444,8 @@ Never change an applied migration. Add a new numbered migration.
 ---
 
 ## 12. Authentication lifecycle
+
+The complete authorization matrix and campus-switching workflow are documented in [ROLE_ACCESS_AND_WORKFLOW.md](./ROLE_ACCESS_AND_WORKFLOW.md).
 
 ```mermaid
 sequenceDiagram

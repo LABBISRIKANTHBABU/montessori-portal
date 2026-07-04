@@ -154,7 +154,7 @@ router.post("/students/:studentId/documents", requirePermission("student.documen
 
 // ─── Preview document (inline serve) ────────────────────────────────────
 
-router.get("/documents/:id/preview", requirePermission("student.view"), async (req: AuthRequest, res, next) => {
+router.get("/:id/preview", requirePermission("student.view"), async (req: AuthRequest, res, next) => {
   try {
     const [rows] = await query(
       "SELECT storage_path, original_filename, mime_type FROM v2_student_documents WHERE id = ? AND school_id = ?",
@@ -173,7 +173,7 @@ router.get("/documents/:id/preview", requirePermission("student.view"), async (r
 
 // ─── Document thumbnail ─────────────────────────────────────────────────
 
-router.get("/documents/:id/thumbnail", requirePermission("student.view"), async (req: AuthRequest, res, next) => {
+router.get("/:id/thumbnail", requirePermission("student.view"), async (req: AuthRequest, res, next) => {
   try {
     const [rows] = await query(
       "SELECT storage_path, original_filename, mime_type FROM v2_student_documents WHERE id = ? AND school_id = ?",
@@ -198,7 +198,7 @@ router.get("/documents/:id/thumbnail", requirePermission("student.view"), async 
 
 // ─── Share document ─────────────────────────────────────────────────────
 
-router.post("/documents/:id/share", requirePermission("student.document.upload"), async (req: AuthRequest, res, next) => {
+router.post("/:id/share", requirePermission("student.document.upload"), async (req: AuthRequest, res, next) => {
   const parsed = z.object({
     userId: z.number().int().positive(),
     permission: z.enum(["view", "edit"]).default("view"),
@@ -253,7 +253,7 @@ router.post("/documents/:id/share", requirePermission("student.document.upload")
 
 // ─── Get document shares ────────────────────────────────────────────────
 
-router.get("/documents/:id/shares", requirePermission("student.view"), async (req: AuthRequest, res, next) => {
+router.get("/:id/shares", requirePermission("student.view"), async (req: AuthRequest, res, next) => {
   try {
     const [docCheck] = await query(
       "SELECT id FROM v2_student_documents WHERE id = ? AND school_id = ?",
@@ -278,7 +278,7 @@ router.get("/documents/:id/shares", requirePermission("student.view"), async (re
 
 // ─── Remove document share ──────────────────────────────────────────────
 
-router.delete("/documents/:id/shares/:shareId", requirePermission("student.document.upload"), async (req: AuthRequest, res, next) => {
+router.delete("/:id/shares/:shareId", requirePermission("student.document.upload"), async (req: AuthRequest, res, next) => {
   try {
     const [shareCheck] = await query(
       "SELECT id FROM v2_document_shares WHERE id = ? AND document_id = ?",
@@ -300,7 +300,7 @@ router.delete("/documents/:id/shares/:shareId", requirePermission("student.docum
 
 // ─── Update document metadata ───────────────────────────────────────────
 
-router.put("/documents/:id/metadata", requirePermission("student.document.upload"), async (req: AuthRequest, res, next) => {
+router.put("/:id/metadata", requirePermission("student.document.upload"), async (req: AuthRequest, res, next) => {
   const parsed = z.object({
     documentName: z.string().min(1).max(255).optional(),
     description: z.string().max(2000).optional(),
@@ -388,7 +388,7 @@ router.post("/bulk-download", requirePermission("student.view"), async (req: Aut
 
 // ─── Download document ──────────────────────────────────────────────────
 
-router.get("/documents/:id/download", requirePermission("student.view"), async (req: AuthRequest, res, next) => {
+router.get("/:id/download", requirePermission("student.view"), async (req: AuthRequest, res, next) => {
   try {
     const [rows] = await query(
       "SELECT storage_path, original_filename, mime_type FROM v2_student_documents WHERE id = ? AND school_id = ?",
@@ -405,7 +405,7 @@ router.get("/documents/:id/download", requirePermission("student.view"), async (
 
 // ─── Replace document (create new version) ──────────────────────────────
 
-router.put("/documents/:id/replace", requirePermission("student.document.upload"), memoryUpload.single("file"), async (req: AuthRequest, res, next) => {
+router.put("/:id/replace", requirePermission("student.document.upload"), memoryUpload.single("file"), async (req: AuthRequest, res, next) => {
   if (!req.file) return res.status(422).json({ message: "Select a replacement file." });
   try {
     const [rows] = await query(
@@ -442,7 +442,7 @@ router.put("/documents/:id/replace", requirePermission("student.document.upload"
 
 // ─── Archive document ───────────────────────────────────────────────────
 
-router.patch("/documents/:id/archive", requirePermission("student.update"), async (req: AuthRequest, res, next) => {
+router.patch("/:id/archive", requirePermission("student.update"), async (req: AuthRequest, res, next) => {
   try {
     await query(
       "UPDATE v2_student_documents SET is_archived = 1, updated_at = UTC_TIMESTAMP() WHERE id = ? AND school_id = ?",
@@ -459,7 +459,7 @@ router.patch("/documents/:id/archive", requirePermission("student.update"), asyn
 
 // ─── Restore (unarchive) document ───────────────────────────────────────
 
-router.patch("/documents/:id/restore", requirePermission("student.update"), async (req: AuthRequest, res, next) => {
+router.patch("/:id/restore", requirePermission("student.update"), async (req: AuthRequest, res, next) => {
   try {
     const [rows] = await query(
       "SELECT id, is_archived FROM v2_student_documents WHERE id = ? AND school_id = ?",
@@ -483,7 +483,7 @@ router.patch("/documents/:id/restore", requirePermission("student.update"), asyn
 
 // ─── Hard delete document ───────────────────────────────────────────────
 
-router.delete("/documents/:id", requirePermission("student.update"), async (req: AuthRequest, res, next) => {
+router.delete("/:id", requirePermission("student.update"), async (req: AuthRequest, res, next) => {
   try {
     const [rows] = await query(
       "SELECT id, storage_path FROM v2_student_documents WHERE id = ? AND school_id = ?",
@@ -519,7 +519,7 @@ router.delete("/documents/:id", requirePermission("student.update"), async (req:
 
 // ─── Get document versions ──────────────────────────────────────────────
 
-router.get("/documents/:id/versions", requirePermission("student.view"), async (req: AuthRequest, res, next) => {
+router.get("/:id/versions", requirePermission("student.view"), async (req: AuthRequest, res, next) => {
   try {
     const [docCheck] = await query(
       "SELECT id FROM v2_student_documents WHERE id = ? AND school_id = ?",

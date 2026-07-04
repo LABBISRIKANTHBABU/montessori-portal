@@ -7,8 +7,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { randomUUID } from "node:crypto";
-import { extname, resolve } from "node:path";
-import { mkdirSync } from "node:fs";
+import { extname } from "node:path";
 import { z } from "zod";
 import { requirePermission } from "../../security/permissions.js";
 import type { AuthRequest } from "../../types/auth.js";
@@ -21,11 +20,10 @@ import {
   listEventBudgets, createEventBudget, deleteEventBudget,
   getEventReports,
 } from "../../repository.js";
-import { resolveStoragePath, fileExists } from "../../storage/storageService.js";
+import { ensureStorageDirectory, resolveStoragePath, fileExists } from "../../storage/storageService.js";
 
 const router = Router();
-const mediaDir = resolve(process.cwd(), "../uploads/events");
-mkdirSync(mediaDir, { recursive: true });
+const mediaDir = ensureStorageDirectory("events");
 
 const mediaStorage = multer.diskStorage({
   destination: (_req, file, cb) => cb(null, mediaDir),

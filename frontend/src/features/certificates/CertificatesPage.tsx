@@ -29,6 +29,7 @@ export default function CertificatesPage() {
   const [studentSearch, setStudentSearch] = useState("");
   const [showAllStudents, setShowAllStudents] = useState(false);
   const [previewId, setPreviewId] = useState<number | null>(null);
+  const [previewUrl, setPreviewUrl] = useState("");
   const [historyId, setHistoryId] = useState<number | null>(null);
   const [history, setHistory] = useState<any[]>([]);
 
@@ -50,6 +51,25 @@ export default function CertificatesPage() {
   };
 
   useEffect(() => { void load(); }, [typeFilter, statusFilter]);
+
+  useEffect(() => {
+    if (!previewId) {
+      setPreviewUrl("");
+      return;
+    }
+    let active = true;
+    let objectUrl = "";
+    api.previewCertificate(previewId).then(blob => {
+      objectUrl = URL.createObjectURL(blob);
+      if (active) setPreviewUrl(objectUrl);
+    }).catch(reason => {
+      if (active) setError(reason instanceof Error ? reason.message : "Certificate preview failed.");
+    });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [previewId]);
 
   const filtered = certificates.filter(c => {
     if (!search) return true;
@@ -305,7 +325,7 @@ export default function CertificatesPage() {
               </div>
             </div>
             <iframe
-              src={api.previewCertificate(previewId)}
+              src={previewUrl || "about:blank"}
               title="Certificate Preview"
               style={{ width: "100%", flex: 1, border: "none", minHeight: 500 }}
             />

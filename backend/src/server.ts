@@ -5,12 +5,12 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import multer, { MulterError } from "multer";
 import { z } from "zod";
-import { mkdirSync, unlinkSync } from "node:fs";
-import { extname, resolve } from "node:path";
+import { unlinkSync } from "node:fs";
+import path, { extname } from "node:path";
 import { randomUUID } from "node:crypto";
 import ExcelJS from "exceljs";
 import { getConfig } from "./config/env.js";
-import { databaseHealth } from "./database/pool.js";
+import { closePool, databaseHealth } from "./database/pool.js";
 import { requirePermission, requireRole, rolePermissions } from "./security/permissions.js";
 import { verifyAccessToken } from "./security/accessToken.js";
 import { resolveSchoolScope } from "./security/schoolScope.js";
@@ -25,10 +25,12 @@ import eventRoutes from "./modules/events/eventRoutes.js";
 import reportRoutes from "./modules/reports/reportRoutes.js";
 import userRoutes from "./modules/users/userRoutes.js";
 import settingRoutes from "./modules/settings/settingRoutes.js";
+import { ensureStorageDirectory } from "./storage/storageService.js";
 
 const app = express();
 const config = getConfig();
 const port = config.PORT;
+app.set("trust proxy", config.NODE_ENV === "production" ? 1 : false);
 
 // ─── Brute Force Protection ──────────────────────────────────────────────
 
@@ -45,8 +47,7 @@ function checkBruteForce(key: string): boolean {
   return true;
 }
 
-const studentUploadDirectory = resolve(process.cwd(), "../uploads/students");
-mkdirSync(studentUploadDirectory, { recursive: true });
+const studentUploadDirectory = ensureStorageDirectory("students");
 const studentPhotoUpload = multer({
   storage: multer.diskStorage({
     destination: studentUploadDirectory,
@@ -638,6 +639,20 @@ app.use("/api/users", authenticate, userRoutes);
 
 app.use("/api/settings", authenticate, settingRoutes);
 
+// ─── Frontend static files (Hostinger deployment) ────────────────────────
+
+if (config.NODE_ENV === "production") {
+  const frontendDist = path.join(process.cwd(), "frontend/dist");
+  app.use(express.static(frontendDist));
+  app.get("*", (req, res, next) => {
+    if (!req.path.startsWith("/api/")) {
+      res.sendFile(path.join(frontendDist, "index.html"));
+    } else {
+      next();
+    }
+  });
+}
+
 // ─── 404 & Error Handler ────────────────────────────────────────────────
 
 app.use((_req, res) => res.status(404).json({ message: "Route not found" }));
@@ -671,5 +686,12 @@ app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ message: error.message, code: "INTERNAL_ERROR", stack: error.stack });
 });
 
-if (process.env.NODE_ENV !== "test") app.listen(port, () => console.log(`Montessori API listening on http://localhost:${port}`));
+if (process.env.NODE_ENV !== "test") {
+  const server = app.listen(port, () => console.log(`Montessori API listening on port ${port}`));
+  const shutdown = () => {
+    server.close(() => { void closePool().finally(() => process.exit(0)); });
+  };
+  process.once("SIGTERM", shutdown);
+  process.once("SIGINT", shutdown);
+}
 export default app;

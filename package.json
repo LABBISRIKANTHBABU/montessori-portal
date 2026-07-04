@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "concurrently -n API,WEB -c green,cyan \"npm run dev -w backend\" \"npm run dev -w frontend\"",
     "build": "npm run build -w backend && npm run build -w frontend",
-    "test": "npm run test -w backend && npm run test -w frontend"
+    "test": "npm run test -w backend && npm run test -w frontend",
+    "start": "npm run start -w backend"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

@@ -3,10 +3,14 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=20 <25"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "smoke:production": "node scripts/smoke-production.mjs",
     "test": "tsx --test test/security.test.ts test/auth-contract.test.ts && tsc --noEmit",
     "test:integration": "tsx --test test/api.test.ts test/repository.test.ts",
     "migrate": "npm run migrate:up",

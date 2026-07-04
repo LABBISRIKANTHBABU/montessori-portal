@@ -10,7 +10,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { extname, join, relative } from "node:path";
+import { extname, join, relative, resolve } from "node:path";
 import { mkdirSync, unlinkSync, existsSync, statSync, readdirSync } from "node:fs";
 
 export type StorageModule = "documents" | "students" | "events" | "settings" | "imports";
@@ -28,10 +28,16 @@ export interface StoredFile {
   sizeBytes: number;
 }
 
-const ROOT = process.env.UPLOAD_ROOT || join(process.cwd(), "uploads");
+const ROOT = resolve(process.env.UPLOAD_ROOT || join(process.cwd(), "uploads"));
 
 function ensureDir(dir: string) {
   mkdirSync(dir, { recursive: true });
+}
+
+export function ensureStorageDirectory(...segments: string[]) {
+  const dir = join(ROOT, ...segments.map(sanitizeSegment));
+  ensureDir(dir);
+  return dir;
 }
 
 function sanitizeSegment(value: string): string {

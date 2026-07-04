@@ -13,6 +13,7 @@ const schema = z.object({
   DB_NAME: z.string().regex(/^[A-Za-z0-9_$-]+$/),
   DB_CONNECTION_LIMIT: z.coerce.number().int().min(2).max(50).default(10),
   DB_SSL: booleanValue.default(true),
+  UPLOAD_ROOT: z.string().min(1).optional(),
   FRONTEND_ORIGIN: z.string().min(1).refine(
     value => value.split(",").every(origin => z.url().safeParse(origin.trim()).success),
     "must be a comma-separated list of valid URLs"
@@ -30,7 +31,7 @@ export function getConfig(): AppConfig {
     const message = result.error.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join("; ");
     throw new Error(`Invalid environment configuration: ${message}`);
   }
-  if (/^(your-|replace|localhost$)/i.test(result.data.DB_HOST)) throw new Error("DB_HOST is still a placeholder.");
+  if (/^(your-|replace)/i.test(result.data.DB_HOST)) throw new Error("DB_HOST is still a placeholder.");
   if (!result.data.DATA_ENCRYPTION_KEY) throw new Error("DATA_ENCRYPTION_KEY is required.");
   if (Buffer.from(result.data.DATA_ENCRYPTION_KEY, "base64").length !== 32) throw new Error("DATA_ENCRYPTION_KEY must be a base64-encoded 32-byte key.");
   cached = result.data;

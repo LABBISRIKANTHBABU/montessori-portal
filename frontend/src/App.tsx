@@ -6,7 +6,7 @@ import {
   Upload, UserRound, Users, WalletCards, X, Shield, Building2, CheckCircle2,
   AlertTriangle, Clock, CreditCard, FileText
 } from "lucide-react";
-import { api, DashboardData, GroupOverview, School, SearchResult, Notification, schoolScope, token } from "./api";
+import { api, apiConfigurationError, DashboardData, GroupOverview, School, SearchResult, Notification, schoolScope, token } from "./api";
 import { ToastProvider } from "./components/Toast";
 import StudentCreatePage from "./features/students/StudentCreatePage";
 import StudentsPage from "./features/students/StudentsPage";
@@ -154,7 +154,11 @@ function Landing() {
   const navigate = useNavigate();
   const [schools, setSchools] = useState<School[]>([]);
   const [search, setSearch] = useState("");
-  useEffect(() => { api.schools().then(r => setSchools(r.data)).catch(() => undefined); }, []);
+  const [loadError, setLoadError] = useState(apiConfigurationError);
+  useEffect(() => {
+    api.schools().then(r => setSchools(r.data))
+      .catch(reason => setLoadError(reason instanceof Error ? reason.message : "Schools could not be loaded."));
+  }, []);
 
   const filtered = schools.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -187,6 +191,7 @@ function Landing() {
       </section>
 
       <section className="school-grid">
+        {loadError && <div className="form-error" role="alert">{loadError}</div>}
         {filtered.map(school => (
           <button key={school.id} className="school-card" onClick={() => navigate(`/login/${school.id}`)}>
             <div className="school-icon"><GraduationCap size={24} /></div>
@@ -787,8 +792,8 @@ function Dashboard({ session }: { session: NonNullable<Session> }) {
                   {extData.pendingTasks.map((task: any) => (
                     <button key={task.id} style={{
                       display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "0.7rem 0",
-                      background: "none", border: "none", borderBottom: "1px solid #2a2d3e",
-                      color: "#e2e4e9", cursor: "pointer", textAlign: "left"
+                      background: "none", border: "none", borderBottom: "1px solid var(--line)",
+                      color: "var(--ink)", cursor: "pointer", textAlign: "left"
                     }} onClick={() => navigate(`/${task.module}`)}>
                       <span style={{
                         width: 32, height: 32, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",

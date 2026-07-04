@@ -11,7 +11,10 @@ export type Student = {
 };
 
 const TOKEN_KEY = "monte_token";
-const API_BASE = import.meta.env.VITE_API_URL || "";
+const API_BASE = String(import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+export const apiConfigurationError = import.meta.env.PROD && !API_BASE
+  ? "Production API is not configured. Set VITE_API_URL in Vercel and redeploy."
+  : "";
 export const apiPath = (path: string) => `${API_BASE}/api${path}`;
 
 export const token = {
@@ -32,6 +35,7 @@ const scopedAuthHeaders = () => ({
 });
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (apiConfigurationError) throw new Error(apiConfigurationError);
   const isForm = options.body instanceof FormData;
   const response = await fetch(apiPath(path), {
     ...options,
@@ -51,6 +55,26 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
   if (!response.ok) throw new Error(body.message || "Something went wrong");
   return body;
+}
+
+async function requestBlob(path: string, options: RequestInit = {}): Promise<Blob> {
+  if (apiConfigurationError) throw new Error(apiConfigurationError);
+  const response = await fetch(apiPath(path), {
+    ...options,
+    credentials: "include",
+    headers: { ...scopedAuthHeaders(), ...options.headers },
+  });
+  if (response.status === 401) {
+    token.clear();
+    schoolScope.clear();
+    localStorage.removeItem("monte_session");
+    window.location.assign("/");
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.message || "File request failed.");
+  }
+  return response.blob();
 }
 
 function buildDateQuery(from: string, to: string): string {
@@ -79,7 +103,8 @@ export const api = {
   updateStudent: (id:number,payload:Record<string,string>) => request<{data:any}>(`/students/${id}`,{method:"PUT",body:JSON.stringify(payload)}),
   changeStudentStatus: (id:number,payload:{status:string;reason?:string}) => request<{data:any}>(`/students/${id}/status`,{method:"PATCH",body:JSON.stringify(payload)}),
   restoreStudent: (id:number) => request<{data:any}>(`/students/${id}/restore`,{method:"POST"}),
-  exportStudents: (search = "", status = "", format: "csv" | "xlsx" = "csv") => apiPath(`/students/export?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}&format=${format}`),
+  exportStudents: (search = "", status = "", format: "csv" | "xlsx" = "csv") =>
+    requestBlob(`/students/export?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}&format=${format}`),
   bulkPromote: (studentIds: number[], targetClass: string, targetSection?: string) =>
     request<{data:any}>("/students/bulk/promote",{method:"POST",body:JSON.stringify({studentIds,targetClass,targetSection})}),
   bulkAssign: (studentIds: number[], assignType: "class" | "section", value: string) =>
@@ -99,16 +124,16 @@ export const api = {
   approveImport:(id:string)=>request<{data:any}>(`/imports/${id}/approve`,{method:"POST"}),
   rejectImport:(id:string)=>request<{data:any}>(`/imports/${id}/reject`,{method:"POST"}),
   rollbackImport:(id:string)=>request<{data:any}>(`/imports/${id}/rollback`,{method:"POST"}),
-  downloadImportErrors:async(id:string)=>{const response=await fetch(apiPath(`/imports/${id}/errors.csv`),{credentials:"include",headers:scopedAuthHeaders()});if(!response.ok)throw new Error("Could not download error report.");return response.blob();},
-  viewErrorReport:(id:string)=>apiPath(`/imports/${id}/errors.html`),
+  downloadImportErrors:(id:string)=>requestBlob(`/imports/${id}/errors.csv`),
+  viewErrorReport:(id:string)=>requestBlob(`/imports/${id}/errors.html`),
 
   // Documents
   documentCategories: () => request<{ data: any[] }>("/documents/categories"),
   studentDocuments: (studentId: number, includeArchived = false) => request<{ data: any[] }>(`/documents/students/${studentId}/documents${includeArchived ? "?archived=1" : ""}`),
   searchDocuments: (q: string, category = "") => request<{ data: any[] }>(`/documents/search?q=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}`),
   uploadDocument: (studentId: number, payload: FormData) => request<{ data: any }>(`/documents/students/${studentId}/documents`, { method: "POST", body: payload }),
-  previewDocument: (docId: number) => apiPath(`/documents/${docId}/preview`),
-  downloadDocument: async (docId: number) => { const r = await fetch(apiPath(`/documents/${docId}/download`), { credentials: "include", headers: scopedAuthHeaders() }); if (!r.ok) throw new Error("Download failed."); return r.blob(); },
+  previewDocument: (docId: number) => requestBlob(`/documents/${docId}/preview`),
+  downloadDocument: (docId: number) => requestBlob(`/documents/${docId}/download`),
   replaceDocument: (docId: number, payload: FormData) => request<{ data: any }>(`/documents/${docId}/replace`, { method: "PUT", body: payload }),
   archiveDocument: (docId: number) => request<{ data: any }>(`/documents/${docId}/archive`, { method: "PATCH" }),
   restoreDocument: (docId: number) => request<{ data: any }>(`/documents/${docId}/restore`, { method: "PATCH" }),
@@ -120,8 +145,8 @@ export const api = {
   studentCertificates: (studentId: number) => request<{ data: any[] }>(`/certificates/students/${studentId}/certificates`),
   generateCertificate: (studentId: number, payload: { certificateType: string; academicYear?: string; reason?: string }) => request<{ data: any }>(`/certificates/students/${studentId}/certificates`, { method: "POST", body: JSON.stringify(payload) }),
   listCertificates: (type = "", status = "") => request<{ data: any[] }>(`/certificates?type=${type}&status=${status}`),
-  previewCertificate: (id: number) => apiPath(`/certificates/${id}/preview`),
-  downloadCertificate: async (id: number) => { const r = await fetch(apiPath(`/certificates/${id}/download`), { credentials: "include", headers: scopedAuthHeaders() }); if (!r.ok) throw new Error("Download failed."); return r.blob(); },
+  previewCertificate: (id: number) => requestBlob(`/certificates/${id}/preview`),
+  downloadCertificate: (id: number) => requestBlob(`/certificates/${id}/download`),
   certificateHistory: (id: number) => request<{ data: any[] }>(`/certificates/${id}/history`),
   revokeCertificate: (id: number) => request<{ data: any }>(`/certificates/${id}/revoke`, { method: "PATCH" }),
 
