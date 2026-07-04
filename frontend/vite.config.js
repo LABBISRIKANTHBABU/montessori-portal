@@ -5,5 +5,16 @@ export default defineConfig({
     server: {
         port: 5173,
         proxy: { "/api": "http://localhost:4000" }
+    },
+    build: {
+        chunkSizeWarningLimit: 1000,
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    vendor: ['react', 'react-dom', 'react-router-dom'],
+                    exceljs: ['exceljs']
+                }
+            }
+        }
     }
 });
