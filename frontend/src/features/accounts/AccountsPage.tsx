@@ -316,7 +316,7 @@ function CashBookTab() {
 
   const dayIncome = entries.filter(e => e.entryType === "income").reduce((s, e) => s + e.amount, 0);
   const dayExpenses = entries.filter(e => e.entryType === "expense").reduce((s, e) => s + e.amount, 0);
-  const closingBalance = 50000 + dayIncome - dayExpenses;
+  const closingBalance = dayIncome - dayExpenses;
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault(); setError("");
@@ -332,7 +332,7 @@ function CashBookTab() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
         <div style={{ padding: 12, background: "var(--cream)", borderRadius: 8 }}>
           <small style={{ color: "var(--muted)", fontSize: 11, fontWeight: 700 }}>OPENING BALANCE</small>
-          <strong style={{ fontSize: 18, display: "block", marginTop: 4 }}>₹50,000</strong>
+          <strong style={{ fontSize: 18, display: "block", marginTop: 4 }}>₹0</strong>
         </div>
         <div style={{ padding: 12, background: "#ecfdf5", borderRadius: 8 }}>
           <small style={{ color: "var(--forest)", fontSize: 11, fontWeight: 700 }}>DAY INCOME</small>

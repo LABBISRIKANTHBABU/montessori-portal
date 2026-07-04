@@ -107,7 +107,7 @@ export default function ImportPage() {
             await wb.xlsx.load(reader.result as ArrayBuffer);
             const sheet = wb.worksheets[0];
             const headers: string[] = [];
-            sheet.getRow(1).eachCell({ includeEmpty: true }, (cell, col) => {
+            sheet.getRow(1).eachCell({ includeEmpty: true }, (cell: any, col: number) => {
               headers[col - 1] = String(cell.value || "").trim();
             });
             resolve(headers);

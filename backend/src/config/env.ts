@@ -6,7 +6,7 @@ const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DEMO_MODE: booleanValue.default(false),
   JWT_SECRET: z.string().min(32),
-  DATA_ENCRYPTION_KEY: z.string().optional(),
+  DATA_ENCRYPTION_KEY: z.string(),
   DB_HOST: z.string().min(1),
   DB_PORT: z.coerce.number().int().min(1).max(65535).default(3306),
   DB_USER: z.string().min(1),
@@ -28,11 +28,9 @@ export function getConfig(): AppConfig {
     const message = result.error.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join("; ");
     throw new Error(`Invalid environment configuration: ${message}`);
   }
-  if (!result.data.DEMO_MODE) {
-    if (/^(your-|replace|localhost$)/i.test(result.data.DB_HOST)) throw new Error("DB_HOST is still a placeholder.");
-    if (!result.data.DATA_ENCRYPTION_KEY) throw new Error("DATA_ENCRYPTION_KEY is required outside demo mode.");
-    if (Buffer.from(result.data.DATA_ENCRYPTION_KEY, "base64").length !== 32) throw new Error("DATA_ENCRYPTION_KEY must be a base64-encoded 32-byte key.");
-  }
+  if (/^(your-|replace|localhost$)/i.test(result.data.DB_HOST)) throw new Error("DB_HOST is still a placeholder.");
+  if (!result.data.DATA_ENCRYPTION_KEY) throw new Error("DATA_ENCRYPTION_KEY is required.");
+  if (Buffer.from(result.data.DATA_ENCRYPTION_KEY, "base64").length !== 32) throw new Error("DATA_ENCRYPTION_KEY must be a base64-encoded 32-byte key.");
   cached = result.data;
   return cached;
 }

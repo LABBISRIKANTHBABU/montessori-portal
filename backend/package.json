@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "tsx --test test/*.test.ts && tsc --noEmit",
+    "migrate": "npm run migrate:up",
     "migrate:status": "tsx src/database/migrate.ts status",
     "migrate:dry-run": "tsx src/database/migrate.ts dry-run",
     "migrate:up": "tsx src/database/migrate.ts up",

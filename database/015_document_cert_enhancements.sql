@@ -21,9 +21,10 @@ CREATE TABLE IF NOT EXISTS v2_document_shares (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Add metadata columns to v2_student_documents
-ALTER TABLE v2_student_documents
-  ADD COLUMN description TEXT NULL AFTER document_name,
-  ADD COLUMN tags JSON NULL AFTER description;
+-- (Already executed)
+-- ALTER TABLE v2_student_documents
+--  ADD COLUMN description TEXT NULL AFTER document_name,
+--  ADD COLUMN tags JSON NULL AFTER description;
 
 -- Add cancellation and superseded columns to v2_certificates
 ALTER TABLE v2_certificates
@@ -32,7 +33,7 @@ ALTER TABLE v2_certificates
   ADD COLUMN cancelled_at TIMESTAMP NULL,
   ADD COLUMN cancelled_by BIGINT UNSIGNED NULL,
   ADD COLUMN superseded_by BIGINT UNSIGNED NULL,
-  ADD COLUMN status ENUM('draft','issued','revoked','cancelled','superseded') NOT NULL DEFAULT 'issued' AFTER storage_path;
+  MODIFY COLUMN status ENUM('draft','issued','revoked','cancelled','superseded') NOT NULL DEFAULT 'issued' AFTER storage_path;
 
 ALTER TABLE v2_certificates
   ADD CONSTRAINT fk_v2_cert_cancelled_by FOREIGN KEY (cancelled_by) REFERENCES v2_users(id);

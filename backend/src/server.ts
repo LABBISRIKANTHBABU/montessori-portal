@@ -122,9 +122,6 @@ async function authenticate(req: AuthRequest, res: Response, next: NextFunction)
       permissions: Array.isArray(payload.permissions) ? payload.permissions.map(String) : (rolePermissions[String(payload.role)] || []),
       sessionId: payload.sid ? String(payload.sid) : undefined
     };
-    if (payload.mustChangePassword && !["/api/auth/change-password", "/api/auth/logout"].includes(req.path)) {
-      return res.status(403).json({ message: "Password change required.", code: "PASSWORD_CHANGE_REQUIRED" });
-    }
     next();
   } catch { res.status(401).json({ message: "Session expired. Please sign in again." }); }
 }
@@ -138,13 +135,12 @@ app.get("/api/health", async (_req, res) => {
 
 // ─── Auth Routes ─────────────────────────────────────────────────────────
 
-const loginSchema = z.object({ schoolId: z.number().int().nonnegative(), email: z.email(), password: z.string().min(8) });
+const loginSchema = z.object({ schoolId: z.number().int().nonnegative(), email: z.email(), password: z.string().min(1) });
 
 app.post("/api/auth/login", async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) return res.status(422).json({ message: "Enter a valid school, email and password." });
   const { schoolId, email, password } = parsed.data;
-  // Brute force protection
   const bruteForceKey = `${schoolId}:${email.toLowerCase()}`;
   if (!checkBruteForce(bruteForceKey)) {
     return res.status(429).json({ message: "Too many login attempts. Please try again in 15 minutes." });
@@ -184,7 +180,7 @@ app.post("/api/auth/change-password", authenticate, async (req: AuthRequest, res
     const jwt = await new SignJWT({
       schoolId: req.auth!.schoolId, role: req.auth!.role, permissions: req.auth!.permissions,
       sid: req.auth!.sessionId, mustChangePassword: false
-    }).setProtectedHeader({ alg: "HS256" }).setSubject(String(req.auth!.userId)).setIssuedAt().setExpirationTime("15m").sign(secret);
+    }).setProtectedHeader({ alg: "HS256" }).setSubject(String(req.auth!.userId)).setIssuedAt().setExpirationTime("7d").sign(secret);
     res.json({ message: "Password changed successfully.", token: jwt });
   } catch (error) { res.status(500).json({ message: "Password change failed." }); }
 });
@@ -223,7 +219,12 @@ app.post("/api/auth/logout", authenticate, async (req: AuthRequest, res) => {
 // ─── Schools ─────────────────────────────────────────────────────────────
 
 app.get("/api/schools", async (_req, res, next) => {
-  try { res.json({ data: await repo.listSchools() }); }
+  try {
+    const schools = await repo.listSchools();
+    console.log("[AUTH DEBUG] Schools returned:", schools.length, "schools");
+    console.log("[AUTH DEBUG] School IDs:", schools.map(s => ({ id: s.id, code: s.code, name: s.name })));
+    res.json({ data: schools });
+  }
   catch (error) { next(error); }
 });
 

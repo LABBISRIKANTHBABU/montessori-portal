@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-process.env.DEMO_MODE = "true";
 process.env.NODE_ENV = "test";
 process.env.JWT_SECRET = "test-secret-that-is-at-least-thirty-two-characters";
 process.env.DATA_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -10,6 +9,7 @@ process.env.DB_USER = "test";
 process.env.DB_PASSWORD = "test";
 process.env.DB_NAME = "test";
 process.env.FRONTEND_ORIGIN = "http://localhost:5173";
+process.env.DEMO_MODE = "false";
 
 // ─── Auth API ───────────────────────────────────────────────────────────
 

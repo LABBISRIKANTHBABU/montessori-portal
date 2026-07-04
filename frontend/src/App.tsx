@@ -112,18 +112,6 @@ const skeletonStyles = document.createElement("style");
 skeletonStyles.textContent = `@keyframes skeleton-shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }`;
 if (!document.getElementById("skeleton-keyframes")) { skeletonStyles.id = "skeleton-keyframes"; document.head.appendChild(skeletonStyles); }
 
-const schoolFallback: School[] = [
-  { id: 1, code: "MEMHSVNK", name: "Montessori EM High School", city: "Vidya Nagar, Kurnool" },
-  { id: 2, code: "MHSA", name: "Montessori High School", city: "Alampur" },
-  { id: 3, code: "MSSSACK", name: "Montessori Senior Secondary School", city: "A-Camp, Kurnool" },
-  { id: 4, code: "MIRSNHK", name: "Montessori Indus Residential School", city: "Kallur" },
-  { id: 5, code: "MEMS", name: "Montessori EM School", city: "Nandyal" },
-  { id: 6, code: "MHSV", name: "Montessori High School Vijayawada", city: "Vijayawada" },
-  { id: 7, code: "MHSG", name: "Montessori High School Guntur", city: "Guntur" },
-  { id: 8, code: "MSRS", name: "Montessori Sarada Residential School", city: "Tirupati" },
-  { id: 9, code: "MSES", name: "Montessori Sri Excellence School", city: "Hyderabad" }
-];
-
 function App() {
   const [session, setSession] = useState<Session>(() => {
     const raw = localStorage.getItem("monte_session");
@@ -162,7 +150,7 @@ function App() {
 
 function Landing() {
   const navigate = useNavigate();
-  const [schools, setSchools] = useState<School[]>(schoolFallback);
+  const [schools, setSchools] = useState<School[]>([]);
   const [search, setSearch] = useState("");
   useEffect(() => { api.schools().then(r => setSchools(r.data)).catch(() => undefined); }, []);
 
@@ -229,7 +217,7 @@ function Landing() {
 function Login({ onLogin, isSuperAdmin }: { onLogin: (session: NonNullable<Session>) => void; isSuperAdmin: boolean }) {
   const navigate = useNavigate();
   const { schoolId: paramSchoolId } = useParams();
-  const [schools, setSchools] = useState<School[]>(schoolFallback);
+  const [schools, setSchools] = useState<School[]>([]);
   const schoolId = isSuperAdmin ? 0 : Number(paramSchoolId || 1);
   const targetSchool = schools.find(s => s.id === schoolId);
   const [email, setEmail] = useState("");
@@ -327,10 +315,10 @@ function ChangePassword({ session, onComplete }: { session: NonNullable<Session>
         <form onSubmit={submit}>
           <span className="step-label">REQUIRED ON FIRST LOGIN</span>
           <h2>Change password</h2>
-          <p className="muted">Use 12+ characters with uppercase, lowercase, a number and symbol.</p>
+          <p className="muted">Use 4+ characters.</p>
           <label>Current password<input name="currentPassword" type="password" required /></label>
-          <label>New password<input name="newPassword" type="password" minLength={12} required /></label>
-          <label>Confirm new password<input name="confirmPassword" type="password" minLength={12} required /></label>
+          <label>New password<input name="newPassword" type="password" minLength={4} required /></label>
+          <label>Confirm new password<input name="confirmPassword" type="password" minLength={4} required /></label>
           {error && <div className="form-error">{error}</div>}
           <button className="primary-button wide" disabled={loading}>
             {loading ? "Securing..." : "Secure account"} <ArrowRight size={18} />
@@ -585,12 +573,12 @@ function SuperAdminDashboard({ session }: { session: NonNullable<Session> }) {
         <section className="metrics">
           <Metric label="Total students" value={data.totals?.students ?? "—"} note="Across all campuses" icon={Users} />
           <Metric label="Active students" value={data.totals?.active ?? "—"} note="Currently enrolled" icon={UserRound} />
-          <Metric label="Campuses" value={data.totals?.schools ?? 9} note="All systems online" icon={GraduationCap} />
+          <Metric label="Campuses" value={data.totals?.schools ?? "—"} note="All systems online" icon={GraduationCap} />
           <Metric label="Pending actions" value={data.totals?.pendingCertificates ?? "—"} note="Requires attention" icon={Award} accent />
         </section>
       ) : (
         <section className="metrics">
-          <Metric label="Campuses" value="9" note="All systems online" icon={GraduationCap} />
+          <Metric label="Campuses" value="—" note="All systems online" icon={GraduationCap} />
         </section>
       )}
     </div>
