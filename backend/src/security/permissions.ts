@@ -78,3 +78,12 @@ export function requirePermission(permission: string) {
     next();
   };
 }
+
+export function requireRole(...roles: string[]) {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.auth || !roles.includes(req.auth.role)) {
+      return res.status(403).json({ message: "This action is restricted to group administration." });
+    }
+    next();
+  };
+}

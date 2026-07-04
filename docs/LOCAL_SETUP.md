@@ -30,7 +30,6 @@ We will use **MySQL Community Server 8.0** for local development to ensure parit
 Once MySQL is running, update your backend `.env` file to point to the local database:
 
 ```env
-DEMO_MODE=false
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_USER=root
@@ -46,4 +45,4 @@ cd backend
 npm run migrate:up
 ```
 
-*Note: Feature development is currently proceeding using the mock repository layer. This MySQL setup will be executed when we transition from `DEMO_MODE=true` to local database validation.*
+All application repositories use the configured MySQL database. There is no mock or demo data layer.

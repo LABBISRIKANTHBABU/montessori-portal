@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-process.env.DEMO_MODE = "false";
 process.env.NODE_ENV = "test";
 process.env.JWT_SECRET = "test-secret-that-is-at-least-thirty-two-characters";
 process.env.DATA_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -30,4 +29,11 @@ test("school admin permissions exclude sensitive identifier access", async () =>
   const { rolePermissions } = await import("../src/security/permissions.js");
   assert.ok(rolePermissions["school_admin"].includes("student.create"));
   assert.equal(rolePermissions["school_admin"].includes("student.identifier.view_sensitive"), false);
+});
+
+test("all operational roles can load the dashboard", async () => {
+  const { rolePermissions } = await import("../src/security/permissions.js");
+  for (const role of ["group_super_admin", "school_admin", "principal", "accountant", "office_staff"]) {
+    assert.ok(rolePermissions[role]?.includes("dashboard.view"), `${role} must be able to view the dashboard`);
+  }
 });

@@ -4,7 +4,6 @@ const booleanValue = z.enum(["true", "false"]).transform(value => value === "tru
 const schema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  DEMO_MODE: booleanValue.default(false),
   JWT_SECRET: z.string().min(32),
   DATA_ENCRYPTION_KEY: z.string(),
   DB_HOST: z.string().min(1),
@@ -14,7 +13,10 @@ const schema = z.object({
   DB_NAME: z.string().regex(/^[A-Za-z0-9_$-]+$/),
   DB_CONNECTION_LIMIT: z.coerce.number().int().min(2).max(50).default(10),
   DB_SSL: booleanValue.default(true),
-  FRONTEND_ORIGIN: z.url(),
+  FRONTEND_ORIGIN: z.string().min(1).refine(
+    value => value.split(",").every(origin => z.url().safeParse(origin.trim()).success),
+    "must be a comma-separated list of valid URLs"
+  ),
   ALLOW_PRODUCTION_MIGRATIONS: booleanValue.default(false)
 });
 

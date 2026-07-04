@@ -325,7 +325,6 @@ npm test
 |---|---|
 | `PORT` | API port, normally `4000` |
 | `NODE_ENV` | `development`, `test` or `production` |
-| `DEMO_MODE` | Must be `false` for database-backed operation |
 | `JWT_SECRET` | JWT signing secret, minimum 32 characters |
 | `DATA_ENCRYPTION_KEY` | Base64-encoded 32-byte AES key |
 | `DB_HOST` | MySQL hostname |
@@ -451,21 +450,16 @@ sequenceDiagram
 
     Browser->>API: POST /api/auth/login
     API->>DB: Verify user, school role and bcrypt hash
-    API->>DB: Create v2_sessions row
-    API-->>Browser: 15-minute JWT + HTTP-only refresh cookie
+    API->>DB: Load permissions and insert audit event
+    API-->>Browser: Signed 7-day JWT
     Browser->>API: Authenticated request
-    API->>DB: Verify session is active
+    API->>API: Verify JWT signature and expiry
     API-->>Browser: Protected response
-    Browser->>API: POST /api/auth/refresh
-    API->>DB: Rotate refresh-token hash
-    API-->>Browser: New access token and refresh cookie
     Browser->>API: POST /api/auth/logout
-    API->>DB: Revoke session
+    Browser->>Browser: Clear token and local session
 ```
 
-### First login
-
-Provisioned users have `force_password_reset=1`. They are redirected to `/change-password`. Other routes reject the JWT until the password is changed.
+There is no forced first-login password change, password expiry or refresh-token flow. The current intentionally simple session model uses one 7-day access token. Replace it with short-lived access tokens plus refresh-token rotation before exposing the application to untrusted public clients.
 
 ### Administrator provisioning
 
@@ -642,10 +636,8 @@ Row:
 
 | Method | Route | Purpose |
 |---|---|---|
-| POST | `/api/auth/login` | Login and create session |
-| POST | `/api/auth/change-password` | Required first-login password change |
-| POST | `/api/auth/refresh` | Rotate refresh token |
-| POST | `/api/auth/logout` | Revoke session |
+| POST | `/api/auth/login` | Validate credentials and return a 7-day JWT |
+| POST | `/api/auth/logout` | Clear the browser authentication state |
 
 ### Dashboard and academic setup
 
@@ -682,8 +674,8 @@ Row:
 | Route | Purpose |
 |---|---|
 | `/` | Landing |
-| `/login` | School-scoped login |
-| `/change-password` | Mandatory first-login password change |
+| `/login/:schoolId` | School-scoped login |
+| `/super-admin` | Group super-admin login |
 | `/dashboard` | School dashboard |
 | `/students` | Student directory |
 | `/students/new` | Complete student intake |
@@ -949,4 +941,3 @@ Never run `migrate:up` merely because a migration exists. Review it, test it on 
 - `README.md`
 
 This handbook should be updated whenever routes, migrations, environment variables, module completion status or deployment procedures change.
-

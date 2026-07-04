@@ -9,7 +9,6 @@ process.env.DB_USER = "test";
 process.env.DB_PASSWORD = "test";
 process.env.DB_NAME = "test";
 process.env.FRONTEND_ORIGIN = "http://localhost:5173";
-process.env.DEMO_MODE = "false";
 
 // ─── Auth API ───────────────────────────────────────────────────────────
 
@@ -19,7 +18,6 @@ test("POST /api/auth/login returns JWT token", async () => {
   assert.ok(result, "Login should succeed with valid credentials");
   assert.ok(typeof result.token === "string" && result.token.length > 0, "Token should be a non-empty string");
   assert.ok(result.token.split(".").length === 3, "Token should have 3 parts (JWT format)");
-  assert.equal(result.mustChangePassword, false);
   assert.equal(typeof result.user.name, "string");
   assert.equal(typeof result.user.role, "string");
   assert.ok(result.school, "Should return school info");
@@ -35,26 +33,6 @@ test("POST /api/auth/login rejects non-existent user", async () => {
   const repo = await import("../src/repository.js");
   const result = await repo.authenticateUser(1, "nobody@montessori.edu", "Montessori@2026");
   assert.equal(result, null, "Login should fail for non-existent user");
-});
-
-test("POST /api/auth/refresh rotates tokens", async () => {
-  const { SignJWT } = await import("jose");
-  const { createHash, randomBytes } = await import("node:crypto");
-  const repo = await import("../src/repository.js");
-
-  // In demo mode, refreshSession returns a new JWT regardless of input
-  const result = await repo.refreshSession("dummy-hash");
-  assert.ok(result, "Refresh should succeed in demo mode");
-  assert.ok(result!.token, "Should return a new token");
-  assert.equal(typeof result!.mustChangePassword, "boolean");
-});
-
-test("POST /api/auth/logout revokes session", async () => {
-  const repo = await import("../src/repository.js");
-  // In demo mode, revokeSession is a no-op (does not throw)
-  await assert.doesNotReject(async () => {
-    await repo.revokeSession("test-session-id", 1);
-  });
 });
 
 // ─── Students API ──────────────────────────────────────────────────────
@@ -118,7 +96,7 @@ test("POST /api/students rejects duplicate admission number", async () => {
 test("GET /api/students/:id returns student detail", async () => {
   const repo = await import("../src/repository.js");
   const listResult = await repo.listStudents(1, "", "", 1, 0);
-  assert.ok(listResult.data.length > 0, "Need at least one student in demo");
+  assert.ok(listResult.data.length > 0, "Need at least one student");
   const studentId = listResult.data[0].id;
   const student = await repo.getStudent(1, studentId);
   assert.ok(student, "Should return student detail");

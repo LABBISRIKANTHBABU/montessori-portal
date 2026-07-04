@@ -1,7 +1,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, ArrowLeft, Upload, FileBadge2, Check, AlertTriangle, Download, Eye, RotateCcw, Trash2, FileText, History, ChevronDown, ChevronUp } from "lucide-react";
-import { api } from "../../api";
+import { api, apiPath } from "../../api";
 
 type WizardStep = "upload" | "mapping" | "preview" | "approve" | "summary";
 type RowStatus = "valid" | "error" | "duplicate";
@@ -319,7 +319,7 @@ export default function ImportPage() {
                 <h3>Upload student workbook</h3>
                 <p>Compatible with the legacy Excel headers. XLSX or CSV · maximum 15 MB.</p>
                 <div style={{ margin: "14px 0", fontSize: "11px", display: "flex", gap: "10px", justifyContent: "center" }}>
-                  <a href="/api/imports/template.xlsx" target="_blank" rel="noreferrer" style={{ color: "var(--forest-2)", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <a href={apiPath("/imports/template.xlsx")} target="_blank" rel="noreferrer" style={{ color: "var(--forest-2)", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "6px" }}>
                     <Download size={14} /> Download Template
                   </a>
                 </div>

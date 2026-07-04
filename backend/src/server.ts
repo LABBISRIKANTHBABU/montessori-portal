@@ -4,17 +4,15 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import multer, { MulterError } from "multer";
-import { SignJWT, jwtVerify } from "jose";
 import { z } from "zod";
 import { mkdirSync, unlinkSync } from "node:fs";
 import { extname, resolve } from "node:path";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
-import bcrypt from "bcryptjs";
+import { randomUUID } from "node:crypto";
 import ExcelJS from "exceljs";
 import { getConfig } from "./config/env.js";
 import { databaseHealth } from "./database/pool.js";
-import { requirePermission, rolePermissions } from "./security/permissions.js";
-import { validatePasswordPolicy } from "./security/passwordPolicy.js";
+import { requirePermission, requireRole, rolePermissions } from "./security/permissions.js";
+import { verifyAccessToken } from "./security/accessToken.js";
 import type { AuthRequest } from "./types/auth.js";
 import type { RowDataPacket } from "mysql2/promise";
 import { parseStudentWorkbook, validateRows } from "./modules/imports/importService.js";
@@ -30,9 +28,6 @@ import settingRoutes from "./modules/settings/settingRoutes.js";
 const app = express();
 const config = getConfig();
 const port = config.PORT;
-const secret = new TextEncoder().encode(config.JWT_SECRET);
-const hashToken = (value: string) => createHash("sha256").update(value).digest("hex");
-const readCookie = (req: Request, name: string) => req.headers.cookie?.split(";").map(value => value.trim().split("=")).find(([key]) => key === name)?.[1];
 
 // ─── Brute Force Protection ──────────────────────────────────────────────
 
@@ -70,7 +65,14 @@ const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSiz
 }});
 
 app.use(helmet());
-app.use(cors({ origin: process.env.FRONTEND_ORIGIN || "http://localhost:5173" }));
+const allowedOrigins = config.FRONTEND_ORIGIN.split(",").map(origin => origin.trim());
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+    else callback(null, false);
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: "1mb" }));
 
 // Security headers
@@ -113,23 +115,36 @@ async function authenticate(req: AuthRequest, res: Response, next: NextFunction)
   const bearer = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
   if (!bearer) return res.status(401).json({ message: "Authentication required" });
   try {
-    const { payload } = await jwtVerify(bearer, secret);
-    if (payload.sid && !(await repo.validateSession(String(payload.sid), Number(payload.sub), Number(payload.schoolId)))) {
-      return res.status(401).json({ message: "Session expired. Please sign in again." });
+    const payload = await verifyAccessToken(bearer);
+    const homeSchoolId = Number(payload.schoolId);
+    let effectiveSchoolId = homeSchoolId;
+    const requestedSchool = req.header("x-school-id");
+    if (requestedSchool !== undefined) {
+      const parsedSchoolId = Number(requestedSchool);
+      if (!Number.isInteger(parsedSchoolId) || parsedSchoolId <= 0) {
+        return res.status(422).json({ message: "Select a valid school." });
+      }
+      if (String(payload.role) !== "group_super_admin" && parsedSchoolId !== homeSchoolId) {
+        return res.status(403).json({ message: "School administrators may access only their assigned school." });
+      }
+      if (String(payload.role) === "group_super_admin" && !(await repo.getSchoolById(parsedSchoolId))) {
+        return res.status(404).json({ message: "School not found." });
+      }
+      effectiveSchoolId = parsedSchoolId;
     }
     req.auth = {
-      userId: Number(payload.sub), schoolId: Number(payload.schoolId), role: String(payload.role),
+      userId: Number(payload.sub), schoolId: effectiveSchoolId, homeSchoolId, role: String(payload.role),
       permissions: Array.isArray(payload.permissions) ? payload.permissions.map(String) : (rolePermissions[String(payload.role)] || []),
-      sessionId: payload.sid ? String(payload.sid) : undefined
+      sessionId: undefined
     };
     next();
-  } catch { res.status(401).json({ message: "Session expired. Please sign in again." }); }
+  } catch { res.status(401).json({ message: "Invalid or expired authentication token." }); }
 }
 
 // ─── Health ──────────────────────────────────────────────────────────────
 
 app.get("/api/health", async (_req, res) => {
-  try { res.json({ status: "ok", mode: config.DEMO_MODE ? "demo" : "database", database: await databaseHealth() }); }
+  try { res.json({ status: "ok", mode: "database", database: await databaseHealth() }); }
   catch { res.status(503).json({ status: "degraded", mode: "database", database: { ok: false } }); }
 });
 
@@ -137,7 +152,7 @@ app.get("/api/health", async (_req, res) => {
 
 const loginSchema = z.object({ schoolId: z.number().int().nonnegative(), email: z.email(), password: z.string().min(1) });
 
-app.post("/api/auth/login", async (req, res) => {
+app.post("/api/auth/login", async (req, res, next) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) return res.status(422).json({ message: "Enter a valid school, email and password." });
   const { schoolId, email, password } = parsed.data;
@@ -146,85 +161,28 @@ app.post("/api/auth/login", async (req, res) => {
     return res.status(429).json({ message: "Too many login attempts. Please try again in 15 minutes." });
   }
   try {
+    if (schoolId !== 0 && !(await repo.getSchoolById(schoolId))) {
+      return res.status(404).json({ message: "School not found." });
+    }
     const ip = req.ip || req.socket.remoteAddress || "unknown";
     const userAgent = req.headers["user-agent"] || "unknown";
     const result = await repo.authenticateUser(schoolId, email, password, ip, userAgent);
     if (!result) return res.status(401).json({ message: "Incorrect email or password." });
-    res.cookie("monte_refresh", randomBytes(48).toString("base64url"), {
-      httpOnly: true, sameSite: "strict", secure: config.NODE_ENV === "production",
-      maxAge: 7 * 24 * 60 * 60 * 1000, path: "/api/auth"
-    });
-    const csrfToken = randomBytes(48).toString("base64url");
-    res.cookie("csrf_token", csrfToken, {
-      httpOnly: false, sameSite: "strict", secure: config.NODE_ENV === "production",
-      maxAge: 7 * 24 * 60 * 60 * 1000, path: "/"
-    });
+    loginAttempts.delete(bruteForceKey);
     return res.json(result);
-  } catch (error) { return res.status(500).json({ message: "Login failed." }); }
+  } catch (error) { return next(error); }
 });
 
-app.post("/api/auth/change-password", authenticate, async (req: AuthRequest, res) => {
-  const parsed = z.object({
-    currentPassword: z.string().min(8),
-    newPassword: z.string()
-  }).safeParse(req.body);
-  if (!parsed.success) return res.status(422).json({ message: "Provide current password and new password." });
-  const policy = validatePasswordPolicy(parsed.data.newPassword);
-  if (!policy.valid) return res.status(422).json({ message: policy.errors[0] });
-  try {
-    const currentHash = await repo.getCurrentPasswordHash(req.auth!.userId);
-    if (currentHash && !(await bcrypt.compare(parsed.data.currentPassword, currentHash))) {
-      return res.status(401).json({ message: "Current password is incorrect." });
-    }
-    await repo.changePassword(req.auth!.userId, await bcrypt.hash(parsed.data.newPassword, 12));
-    const jwt = await new SignJWT({
-      schoolId: req.auth!.schoolId, role: req.auth!.role, permissions: req.auth!.permissions,
-      sid: req.auth!.sessionId, mustChangePassword: false
-    }).setProtectedHeader({ alg: "HS256" }).setSubject(String(req.auth!.userId)).setIssuedAt().setExpirationTime("7d").sign(secret);
-    res.json({ message: "Password changed successfully.", token: jwt });
-  } catch (error) { res.status(500).json({ message: "Password change failed." }); }
-});
-
-app.post("/api/auth/refresh", async (req, res) => {
-  const refreshToken = readCookie(req, "monte_refresh");
-  if (!refreshToken) return res.status(401).json({ message: "Refresh session not found." });
-  // CSRF double-submit cookie validation
-  const csrfHeader = req.headers["x-csrf-token"];
-  const csrfCookie = readCookie(req, "csrf_token");
-  if (!csrfHeader || !csrfCookie || csrfHeader !== csrfCookie) {
-    return res.status(403).json({ message: "CSRF validation failed." });
-  }
-  try {
-    const result = await repo.refreshSession(hashToken(refreshToken));
-    if (!result) return res.status(401).json({ message: "Refresh session expired." });
-    res.cookie("monte_refresh", randomBytes(48).toString("base64url"), {
-      httpOnly: true, sameSite: "strict", secure: config.NODE_ENV === "production",
-      maxAge: 7 * 24 * 60 * 60 * 1000, path: "/api/auth"
-    });
-    const csrfToken = randomBytes(48).toString("base64url");
-    res.cookie("csrf_token", csrfToken, {
-      httpOnly: false, sameSite: "strict", secure: config.NODE_ENV === "production",
-      maxAge: 7 * 24 * 60 * 60 * 1000, path: "/"
-    });
-    res.json(result);
-  } catch { res.status(401).json({ message: "Refresh session expired." }); }
-});
-
-app.post("/api/auth/logout", authenticate, async (req: AuthRequest, res) => {
-  if (req.auth?.sessionId) await repo.revokeSession(req.auth.sessionId, req.auth.userId);
+app.post("/api/auth/logout", (_req, res) => {
   res.clearCookie("monte_refresh", { path: "/api/auth" });
+  res.clearCookie("csrf_token", { path: "/" });
   res.json({ message: "Signed out." });
 });
 
 // ─── Schools ─────────────────────────────────────────────────────────────
 
 app.get("/api/schools", async (_req, res, next) => {
-  try {
-    const schools = await repo.listSchools();
-    console.log("[AUTH DEBUG] Schools returned:", schools.length, "schools");
-    console.log("[AUTH DEBUG] School IDs:", schools.map(s => ({ id: s.id, code: s.code, name: s.name })));
-    res.json({ data: schools });
-  }
+  try { res.json({ data: await repo.listSchools() }); }
   catch (error) { next(error); }
 });
 
@@ -238,6 +196,23 @@ app.get("/api/dashboard", authenticate, requirePermission("dashboard.view"), asy
 app.get("/api/dashboard/extended", authenticate, requirePermission("dashboard.view"), async (req: AuthRequest, res, next) => {
   try { res.json({ data: await repo.getDashboardExtended(req.auth!.schoolId, req.auth!.role) }); }
   catch (error) { next(error); }
+});
+
+app.get("/api/admin/overview", authenticate, requireRole("group_super_admin"), async (_req, res, next) => {
+  try { res.json({ data: await repo.getGroupOverview() }); }
+  catch (error) { next(error); }
+});
+
+app.get("/api/access-model", authenticate, async (req: AuthRequest, res) => {
+  res.json({
+    data: {
+      role: req.auth!.role,
+      scope: req.auth!.role === "group_super_admin" ? "all_schools" : "assigned_school",
+      homeSchoolId: req.auth!.homeSchoolId,
+      activeSchoolId: req.auth!.schoolId,
+      permissions: req.auth!.permissions,
+    },
+  });
 });
 
 // ─── Global Search ───────────────────────────────────────────────────────
@@ -674,6 +649,11 @@ app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
   if (error instanceof MulterError) {
     const message = error.code === "LIMIT_FILE_SIZE" ? "File must be smaller than 5 MB." : "File upload failed.";
     return res.status(422).json({ message, code: error.code });
+  }
+
+  const databaseCodes = new Set(["ECONNREFUSED", "ETIMEDOUT", "ENOTFOUND", "ER_ACCESS_DENIED_ERROR", "ER_NO_SUCH_TABLE", "PROTOCOL_CONNECTION_LOST"]);
+  if (databaseCodes.has(String((error as Error & { code?: string }).code))) {
+    return res.status(503).json({ message: "Database unavailable.", code: "DATABASE_UNAVAILABLE" });
   }
 
   // Known application errors with status codes

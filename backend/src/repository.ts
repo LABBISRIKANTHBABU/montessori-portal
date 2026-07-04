@@ -5,10 +5,9 @@
  * the MySQL database directly — no mock data, no demo mode.
  */
 
-import { randomBytes, randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
-import { getConfig } from "./config/env.js";
 import { getPool, query } from "./database/pool.js";
+import { createAccessToken } from "./security/accessToken.js";
 import { createProductionStudent, getProductionAcademicSetup, getProductionDashboard, getProductionStudent, listProductionStudents, updateProductionStudent, changeProductionStudentStatus, restoreProductionStudent, exportProductionStudents, checkDuplicateAdmission, bulkPromoteProductionStudents, bulkAssignProductionStudents, getProductionStudentTimeline, getProductionStudentMedical, upsertProductionStudentMedical, getProductionStudentNotes, createProductionStudentNote, deleteProductionStudentNote } from "./modules/students/studentRepository.js";
 import { listBatches, getBatch, stageBatch, approveBatch, existingAdmissionNumbers } from "./modules/imports/importService.js";
 import type { RowDataPacket } from "mysql2/promise";
@@ -18,12 +17,8 @@ import type { RowDataPacket } from "mysql2/promise";
 export type School = { id: number; code: string; name: string; city: string };
 
 export type AuthAccount = {
-  userId: number; userName: string; passwordHash: string; forcePasswordReset: boolean;
+  userId: number; userName: string; passwordHash: string; active: boolean;
   roleCode: string; schoolId: number; code: string; schoolName: string; city: string;
-};
-
-export type SessionRecord = {
-  id: string; userId: number; schoolId: number; roleCode: string; forcePasswordReset: boolean;
 };
 
 // ─── Helper ──────────────────────────────────────────────────────────────
@@ -69,150 +64,92 @@ export async function getSchoolById(schoolId: number): Promise<School | null> {
 // ─── Authentication ──────────────────────────────────────────────────────
 
 export async function authenticateUser(schoolId: number, email: string, password: string, ipAddress?: string, userAgent?: string): Promise<{
-  token: string; mustChangePassword: boolean;
+  token: string;
   user: { name: string; role: string }; school: School;
 } | null> {
-  const { SignJWT } = await import("jose");
-  const secret = new TextEncoder().encode(getConfig().JWT_SECRET);
-
   // Super admin login (schoolId = 0): don't filter by school
   const isSuperAdminLogin = schoolId === 0;
-  const query = `SELECT u.id AS userId, u.name AS userName, u.email, u.password_hash AS passwordHash, u.force_password_reset AS forcePasswordReset, usr.role_code AS roleCode,
+  const sql = `SELECT u.id AS userId, u.name AS userName, u.email, u.password_hash AS passwordHash, u.is_active AS active, usr.role_code AS roleCode,
             s.id AS schoolId, s.legacy_code AS code, s.name AS schoolName, COALESCE(s.city, '') AS city
      FROM v2_users u
      JOIN v2_user_school_roles usr ON usr.user_id = u.id
      JOIN v2_schools s ON s.id = usr.school_id
-     WHERE LOWER(u.email) = LOWER(?) AND u.is_active = 1 ${isSuperAdminLogin ? "" : "AND s.id = ?"} LIMIT 1`;
+     WHERE LOWER(u.email) = LOWER(?) ${isSuperAdminLogin ? "AND usr.role_code = 'group_super_admin'" : "AND s.id = ?"} LIMIT 1`;
   const params = isSuperAdminLogin ? [email] : [email, schoolId];
   
-  const [rows] = await getPool().execute<RowDataPacket[]>(query, params);
+  const [rows] = await getPool().execute<RowDataPacket[]>(sql, params);
   
   const account = rows[0] as AuthAccount | undefined;
   if (!account) return null;
+  if (!account.active) throw Object.assign(new Error("Account disabled."), { statusCode: 403 });
   
   const passwordMatch = await bcrypt.compare(password, String(account.passwordHash));
   if (!passwordMatch) return null;
   
-  // Super admin login must have group_super_admin role
-  if (isSuperAdminLogin && account.roleCode !== "group_super_admin") return null;
-
   const roleDisplay = ROLE_NAMES[account.roleCode] || account.roleCode;
   const [permRows] = await getPool().execute<RowDataPacket[]>(
     "SELECT permission_code FROM v2_role_permissions WHERE role_code = ?", [account.roleCode]
   );
   const permissions = permRows.map((r: any) => String(r.permission_code));
 
-  // Concurrent session limit (max 5 per user)
-  const [sessionCount] = await getPool().execute<RowDataPacket[]>(
-    "SELECT COUNT(*) cnt FROM v2_sessions WHERE user_id = ? AND revoked_at IS NULL AND expires_at > UTC_TIMESTAMP()",
-    [account.userId]
-  );
-  if (Number(sessionCount[0]?.cnt || 0) >= 5) {
-    const [oldest] = await getPool().execute<RowDataPacket[]>(
-      "SELECT id FROM v2_sessions WHERE user_id = ? AND revoked_at IS NULL AND expires_at > UTC_TIMESTAMP() ORDER BY expires_at ASC LIMIT 1",
-      [account.userId]
-    );
-    if (oldest[0]) {
-      await getPool().execute("UPDATE v2_sessions SET revoked_at = UTC_TIMESTAMP() WHERE id = ?", [String(oldest[0].id)]);
-    }
-  }
-
-  const sessionId = randomUUID();
-  const refreshToken = randomBytes(48).toString("base64url");
-  const hashToken = (v: string) => require("node:crypto").createHash("sha256").update(v).digest("hex");
-  await getPool().execute(
-    "INSERT INTO v2_sessions (id,user_id,school_id,refresh_token_hash,expires_at,ip_address,user_agent) VALUES (?,?,?,?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 7 DAY),?,?)",
-    [sessionId, account.userId, schoolId, hashToken(refreshToken), ipAddress || null, userAgent || null]
-  );
   await getPool().execute("UPDATE v2_users SET last_login_at=UTC_TIMESTAMP() WHERE id=?", [account.userId]);
   await getPool().execute(
     `INSERT INTO v2_audit_events (school_id, user_id, entity_type, entity_id, action_name, metadata_json)
      VALUES (?, ?, 'user', ?, 'auth.login', JSON_OBJECT('ip_address', ?, 'user_agent', ?))`,
-    [schoolId, account.userId, account.userId, ipAddress || null, userAgent || null]
+    [account.schoolId, account.userId, account.userId, ipAddress || null, userAgent || null]
   );
 
-  const jwt = await new SignJWT({ schoolId, role: account.roleCode, permissions, sid: sessionId, mustChangePassword: account.forcePasswordReset })
-    .setProtectedHeader({ alg: "HS256" }).setSubject(String(account.userId))
-    .setIssuedAt().setExpirationTime("7d").sign(secret);
+  const jwt = await createAccessToken({
+    userId: account.userId,
+    schoolId: account.schoolId,
+    role: account.roleCode,
+    permissions,
+  });
 
   return {
-    token: jwt, mustChangePassword: account.forcePasswordReset,
+    token: jwt,
     user: { name: account.userName, role: roleDisplay },
     school: { id: account.schoolId, code: account.code, name: account.schoolName, city: account.city },
   };
-}
-
-export async function refreshSession(refreshTokenHash: string): Promise<{
-  token: string; mustChangePassword: boolean;
-} | null> {
-  const { SignJWT } = await import("jose");
-  const secret = new TextEncoder().encode(getConfig().JWT_SECRET);
-
-  const [rows] = await getPool().execute<RowDataPacket[]>(
-    `SELECT se.id, se.user_id, se.school_id, u.force_password_reset, usr.role_code
-     FROM v2_sessions se JOIN v2_users u ON u.id = se.user_id
-     JOIN v2_user_school_roles usr ON usr.user_id = u.id AND usr.school_id = se.school_id
-     WHERE se.refresh_token_hash = ? AND se.revoked_at IS NULL AND se.expires_at > UTC_TIMESTAMP() AND u.is_active = 1 LIMIT 1`,
-    [refreshTokenHash]
-  );
-  if (!rows[0]) return null;
-
-  const roleDisplay = ROLE_NAMES[String(rows[0].role_code)] || String(rows[0].role_code);
-  const [permRows] = await getPool().execute<RowDataPacket[]>(
-    "SELECT permission_code FROM v2_role_permissions WHERE role_code = ?", [rows[0].role_code]
-  );
-  const permissions = permRows.map((r: any) => String(r.permission_code));
-
-  const hashToken = (v: string) => require("node:crypto").createHash("sha256").update(v).digest("hex");
-  const nextRefresh = randomBytes(48).toString("base64url");
-  await getPool().execute(
-    "UPDATE v2_sessions SET refresh_token_hash = ?, last_used_at = UTC_TIMESTAMP() WHERE id = ?",
-    [hashToken(nextRefresh), rows[0].id]
-  );
-
-  const jwt = await new SignJWT({
-    schoolId: rows[0].school_id, role: String(rows[0].role_code), permissions,
-    sid: rows[0].id, mustChangePassword: Boolean(rows[0].force_password_reset),
-  }).setProtectedHeader({ alg: "HS256" }).setSubject(String(rows[0].user_id))
-    .setIssuedAt().setExpirationTime("7d").sign(secret);
-
-  return { token: jwt, mustChangePassword: Boolean(rows[0].force_password_reset) };
-}
-
-export async function validateSession(sessionId: string, userId: number, schoolId: number): Promise<boolean> {
-  const [rows] = await getPool().execute<RowDataPacket[]>(
-    "SELECT id FROM v2_sessions WHERE id = ? AND user_id = ? AND school_id = ? AND revoked_at IS NULL AND expires_at > UTC_TIMESTAMP()",
-    [sessionId, userId, schoolId]
-  );
-  return Boolean(rows[0]);
-}
-
-export async function revokeSession(sessionId: string, userId: number): Promise<void> {
-  await getPool().execute(
-    "UPDATE v2_sessions SET revoked_at = UTC_TIMESTAMP() WHERE id = ? AND user_id = ?",
-    [sessionId, userId]
-  );
-}
-
-export async function changePassword(userId: number, newPasswordHash: string): Promise<void> {
-  await getPool().execute(
-    "UPDATE v2_users SET password_hash = ?, force_password_reset = 0, password_changed_at = UTC_TIMESTAMP() WHERE id = ?",
-    [newPasswordHash, userId]
-  );
-  // Audit logged by caller
-}
-
-export async function getCurrentPasswordHash(userId: number): Promise<string | null> {
-  const [rows] = await getPool().execute<RowDataPacket[]>(
-    "SELECT password_hash FROM v2_users WHERE id = ? AND is_active = 1", [userId]
-  );
-  return rows[0] ? String(rows[0].password_hash) : null;
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────────────
 
 export async function getDashboard(schoolId: number) {
   return getProductionDashboard(schoolId);
+}
+
+export async function getGroupOverview() {
+  const [rows] = await getPool().execute<RowDataPacket[]>(
+    `SELECT s.id, s.legacy_code code, s.name, COALESCE(s.city, '') city,
+            (SELECT COUNT(*) FROM v2_students st WHERE st.school_id=s.id AND st.deleted_at IS NULL) students,
+            (SELECT COUNT(*) FROM v2_students st WHERE st.school_id=s.id AND st.deleted_at IS NULL AND st.current_status='active') activeStudents,
+            (SELECT COUNT(*) FROM v2_events e WHERE e.school_id=s.id) events,
+            (SELECT COALESCE(SUM(fp.amount),0) FROM v2_fee_payments fp WHERE fp.school_id=s.id) fees,
+            (SELECT COUNT(*) FROM v2_certificates c WHERE c.school_id=s.id) certificates,
+            (SELECT COUNT(*) FROM v2_users u JOIN v2_user_school_roles usr ON usr.user_id=u.id WHERE usr.school_id=s.id AND u.is_active=1) staff
+     FROM v2_schools s
+     WHERE s.status='active'
+     ORDER BY s.name`
+  );
+  const schools = rows.map((row: any) => ({
+    id: Number(row.id), code: String(row.code), name: String(row.name), city: String(row.city),
+    students: Number(row.students || 0), activeStudents: Number(row.activeStudents || 0),
+    events: Number(row.events || 0), fees: Number(row.fees || 0),
+    certificates: Number(row.certificates || 0), staff: Number(row.staff || 0),
+  }));
+  return {
+    totals: schools.reduce((totals, school) => ({
+      schools: totals.schools + 1,
+      students: totals.students + school.students,
+      activeStudents: totals.activeStudents + school.activeStudents,
+      events: totals.events + school.events,
+      fees: totals.fees + school.fees,
+      certificates: totals.certificates + school.certificates,
+      staff: totals.staff + school.staff,
+    }), { schools: 0, students: 0, activeStudents: 0, events: 0, fees: 0, certificates: 0, staff: 0 }),
+    schools,
+  };
 }
 
 // ─── Students ────────────────────────────────────────────────────────────

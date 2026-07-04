@@ -235,9 +235,20 @@ export async function checkDuplicateAdmission(schoolId: number, admissionNo: str
 
 export async function getProductionDashboard(schoolId: number) {
   const [[totals]] = await getPool().execute<RowDataPacket[]>(`SELECT COUNT(*) students,SUM(current_status='active') active FROM v2_students WHERE school_id=? AND deleted_at IS NULL`, [schoolId]);
+  const [[events]] = await getPool().execute<RowDataPacket[]>(`SELECT COUNT(*) total FROM v2_events WHERE school_id=?`, [schoolId]);
+  const [[fees]] = await getPool().execute<RowDataPacket[]>(`SELECT COALESCE(SUM(amount),0) total FROM v2_fee_payments WHERE school_id=?`, [schoolId]);
+  const [[certificates]] = await getPool().execute<RowDataPacket[]>(`SELECT COUNT(*) total FROM v2_certificates WHERE school_id=?`, [schoolId]);
   const [classes] = await getPool().execute<RowDataPacket[]>(`SELECT a.class_admitted label,COUNT(*) value FROM v2_admissions a JOIN v2_students s ON s.id=a.student_id WHERE a.school_id=? AND s.deleted_at IS NULL GROUP BY a.class_admitted ORDER BY a.class_admitted`, [schoolId]);
   const [recent] = await getPool().execute<RowDataPacket[]>(`SELECT action_name title,CONCAT(entity_type,' #',COALESCE(entity_id,'')) meta,DATE_FORMAT(created_at,'%d %b %H:%i') time FROM v2_audit_events WHERE school_id=? ORDER BY created_at DESC LIMIT 6`, [schoolId]);
-  return { totals: { students: Number(totals?.students || 0), active: Number(totals?.active || 0), schools: 1, pendingCertificates: 0 }, enrollmentByClass: classes, recent };
+  return {
+    totals: {
+      students: Number(totals?.students || 0), active: Number(totals?.active || 0),
+      events: Number(events?.total || 0), fees: Number(fees?.total || 0),
+      certificates: Number(certificates?.total || 0), schools: 1, pendingCertificates: 0,
+    },
+    enrollmentByClass: classes,
+    recent,
+  };
 }
 
 export async function bulkPromoteProductionStudents(schoolId: number, studentIds: number[], targetClass: string, targetSection: string | undefined, userId: number) {

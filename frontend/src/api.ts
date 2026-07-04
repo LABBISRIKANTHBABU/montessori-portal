@@ -11,6 +11,8 @@ export type Student = {
 };
 
 const TOKEN_KEY = "monte_token";
+const API_BASE = import.meta.env.VITE_API_URL || "";
+export const apiPath = (path: string) => `${API_BASE}/api${path}`;
 
 export const token = {
   get: () => localStorage.getItem(TOKEN_KEY),
@@ -18,17 +20,9 @@ export const token = {
   clear: () => localStorage.removeItem(TOKEN_KEY)
 };
 
-let refreshInFlight: Promise<boolean> | null = null;
-async function refreshAccess() {
-  if (!refreshInFlight) refreshInFlight = fetch("/api/auth/refresh", { method: "POST", credentials: "include" }).then(async response => {
-    if (!response.ok) return false;
-    const body = await response.json(); token.set(body.token); return true;
-  }).finally(() => { refreshInFlight = null; });
-  return refreshInFlight;
-}
-async function request<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const isForm = options.body instanceof FormData;
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(apiPath(path), {
     ...options,
     credentials: "include",
     headers: {
@@ -37,10 +31,12 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
       ...options.headers
     }
   });
-  if (response.status === 401 && retry && !path.startsWith("/auth/")) {
-    if (await refreshAccess()) return request<T>(path, options, false);
-  }
   const body = await response.json().catch(() => ({}));
+  if (response.status === 401 && !path.startsWith("/auth/")) {
+    token.clear();
+    localStorage.removeItem("monte_session");
+    window.location.assign("/");
+  }
   if (!response.ok) throw new Error(body.message || "Something went wrong");
   return body;
 }
@@ -55,12 +51,11 @@ function buildDateQuery(from: string, to: string): string {
 export const api = {
   schools: () => request<{ data: School[] }>("/schools"),
   login: (payload: { schoolId: number; email: string; password: string }) =>
-    request<{ token: string; mustChangePassword?: boolean; user: { name: string; role: string }; school: School }>("/auth/login", {
+    request<{ token: string; user: { name: string; role: string }; school: School }>("/auth/login", {
       method: "POST",
       body: JSON.stringify(payload)
     }),
   dashboard: () => request<{ data: DashboardData }>("/dashboard"),
-  changePassword: (payload:{currentPassword:string;newPassword:string}) => request<{message:string;token:string}>("/auth/change-password",{method:"POST",body:JSON.stringify(payload)}),
   logout: () => request<{message:string}>("/auth/logout",{method:"POST"}),
   students: (query = "", status = "", page = 1) => request<{ data: Student[]; total: number; page: number; limit: number }>(`/students?search=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}&page=${page}`),
   academicSetup: () => request<{ data: { academicYears: string[]; boards: string[]; classes: string[] } }>("/academic/setup"),
@@ -70,7 +65,7 @@ export const api = {
   updateStudent: (id:number,payload:Record<string,string>) => request<{data:any}>(`/students/${id}`,{method:"PUT",body:JSON.stringify(payload)}),
   changeStudentStatus: (id:number,payload:{status:string;reason?:string}) => request<{data:any}>(`/students/${id}/status`,{method:"PATCH",body:JSON.stringify(payload)}),
   restoreStudent: (id:number) => request<{data:any}>(`/students/${id}/restore`,{method:"POST"}),
-  exportStudents: (search = "", status = "", format: "csv" | "xlsx" = "csv") => `/api/students/export?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}&format=${format}`,
+  exportStudents: (search = "", status = "", format: "csv" | "xlsx" = "csv") => apiPath(`/students/export?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}&format=${format}`),
   bulkPromote: (studentIds: number[], targetClass: string, targetSection?: string) =>
     request<{data:any}>("/students/bulk/promote",{method:"POST",body:JSON.stringify({studentIds,targetClass,targetSection})}),
   bulkAssign: (studentIds: number[], assignType: "class" | "section", value: string) =>
@@ -90,16 +85,16 @@ export const api = {
   approveImport:(id:string)=>request<{data:any}>(`/imports/${id}/approve`,{method:"POST"}),
   rejectImport:(id:string)=>request<{data:any}>(`/imports/${id}/reject`,{method:"POST"}),
   rollbackImport:(id:string)=>request<{data:any}>(`/imports/${id}/rollback`,{method:"POST"}),
-  downloadImportErrors:async(id:string)=>{const response=await fetch(`/api/imports/${id}/errors.csv`,{credentials:"include",headers:{Authorization:`Bearer ${token.get()}`}});if(!response.ok)throw new Error("Could not download error report.");return response.blob();},
-  viewErrorReport:(id:string)=>`/api/imports/${id}/errors.html`,
+  downloadImportErrors:async(id:string)=>{const response=await fetch(apiPath(`/imports/${id}/errors.csv`),{credentials:"include",headers:{Authorization:`Bearer ${token.get()}`}});if(!response.ok)throw new Error("Could not download error report.");return response.blob();},
+  viewErrorReport:(id:string)=>apiPath(`/imports/${id}/errors.html`),
 
   // Documents
   documentCategories: () => request<{ data: any[] }>("/documents/categories"),
   studentDocuments: (studentId: number, includeArchived = false) => request<{ data: any[] }>(`/documents/students/${studentId}/documents${includeArchived ? "?archived=1" : ""}`),
   searchDocuments: (q: string, category = "") => request<{ data: any[] }>(`/documents/search?q=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}`),
   uploadDocument: (studentId: number, payload: FormData) => request<{ data: any }>(`/documents/students/${studentId}/documents`, { method: "POST", body: payload }),
-  previewDocument: (docId: number) => `/api/documents/${docId}/preview`,
-  downloadDocument: async (docId: number) => { const r = await fetch(`/api/documents/${docId}/download`, { credentials: "include", headers: { Authorization: `Bearer ${token.get()}` } }); if (!r.ok) throw new Error("Download failed."); return r.blob(); },
+  previewDocument: (docId: number) => apiPath(`/documents/${docId}/preview`),
+  downloadDocument: async (docId: number) => { const r = await fetch(apiPath(`/documents/${docId}/download`), { credentials: "include", headers: { Authorization: `Bearer ${token.get()}` } }); if (!r.ok) throw new Error("Download failed."); return r.blob(); },
   replaceDocument: (docId: number, payload: FormData) => request<{ data: any }>(`/documents/${docId}/replace`, { method: "PUT", body: payload }),
   archiveDocument: (docId: number) => request<{ data: any }>(`/documents/${docId}/archive`, { method: "PATCH" }),
   restoreDocument: (docId: number) => request<{ data: any }>(`/documents/${docId}/restore`, { method: "PATCH" }),
@@ -111,8 +106,8 @@ export const api = {
   studentCertificates: (studentId: number) => request<{ data: any[] }>(`/certificates/students/${studentId}/certificates`),
   generateCertificate: (studentId: number, payload: { certificateType: string; academicYear?: string; reason?: string }) => request<{ data: any }>(`/certificates/students/${studentId}/certificates`, { method: "POST", body: JSON.stringify(payload) }),
   listCertificates: (type = "", status = "") => request<{ data: any[] }>(`/certificates?type=${type}&status=${status}`),
-  previewCertificate: (id: number) => `/api/certificates/${id}/preview`,
-  downloadCertificate: async (id: number) => { const r = await fetch(`/api/certificates/${id}/download`, { credentials: "include", headers: { Authorization: `Bearer ${token.get()}` } }); if (!r.ok) throw new Error("Download failed."); return r.blob(); },
+  previewCertificate: (id: number) => apiPath(`/certificates/${id}/preview`),
+  downloadCertificate: async (id: number) => { const r = await fetch(apiPath(`/certificates/${id}/download`), { credentials: "include", headers: { Authorization: `Bearer ${token.get()}` } }); if (!r.ok) throw new Error("Download failed."); return r.blob(); },
   certificateHistory: (id: number) => request<{ data: any[] }>(`/certificates/${id}/history`),
   revokeCertificate: (id: number) => request<{ data: any }>(`/certificates/${id}/revoke`, { method: "PATCH" }),
 
@@ -125,30 +120,30 @@ export const api = {
   feePayments: (studentId = 0, year = "") => request<{ data: any[] }>(`/accounts/fee-payments?studentId=${studentId}&year=${year}`),
   collectFee: (payload: any) => request<{ data: any }>("/accounts/fee-payments", { method: "POST", body: JSON.stringify(payload) }),
   studentFees: (studentId: number, year = "") => request<{ data: any }>(`/accounts/students/${studentId}/fees?year=${year}`),
-  receiptPreview: (id: number) => `/api/accounts/fee-payments/${id}/receipt/preview`,
-  receiptPdf: (id: number) => `/api/accounts/fees/receipt/${id}/pdf`,
+  receiptPreview: (id: number) => apiPath(`/accounts/fee-payments/${id}/receipt/preview`),
+  receiptPdf: (id: number) => apiPath(`/accounts/fees/receipt/${id}/pdf`),
   cashbook: (date = "") => request<{ data: any[] }>(`/accounts/cashbook?date=${date}`),
   addCashbookEntry: (payload: any) => request<{ data: any }>("/accounts/cashbook", { method: "POST", body: JSON.stringify(payload) }),
-  cashbookExport: (date = "") => `/api/accounts/reports/cashbook/export?date=${date}`,
+  cashbookExport: (date = "") => apiPath(`/accounts/reports/cashbook/export?date=${date}`),
   bankBook: (month = "") => request<{ data: any[] }>(`/accounts/bank-book?month=${month}`),
   suppliers: () => request<{ data: any[] }>("/accounts/suppliers"),
   createSupplier: (payload: any) => request<{ data: any }>("/accounts/suppliers", { method: "POST", body: JSON.stringify(payload) }),
   supplierTransactions: (id: number) => request<{ data: any[] }>(`/accounts/suppliers/${id}/transactions`),
   addSupplierTransaction: (id: number, payload: any) => request<{ data: any }>(`/accounts/suppliers/${id}/transactions`, { method: "POST", body: JSON.stringify(payload) }),
   supplierOutstanding: () => request<{ data: any[] }>("/accounts/suppliers/outstanding"),
-  supplierExport: (id: number) => `/api/accounts/suppliers/${id}/export`,
+  supplierExport: (id: number) => apiPath(`/accounts/suppliers/${id}/export`),
   vouchers: (type = "") => request<{ data: any[] }>(`/accounts/vouchers?type=${type}`),
   createVoucher: (payload: any) => request<{ data: any }>("/accounts/vouchers", { method: "POST", body: JSON.stringify(payload) }),
-  voucherPreview: (id: number) => `/api/accounts/vouchers/${id}/preview`,
-  voucherPdf: (id: number) => `/api/accounts/vouchers/${id}/pdf`,
-  voucherExport: (type = "") => `/api/accounts/vouchers/export?type=${type}`,
+  voucherPreview: (id: number) => apiPath(`/accounts/vouchers/${id}/preview`),
+  voucherPdf: (id: number) => apiPath(`/accounts/vouchers/${id}/pdf`),
+  voucherExport: (type = "") => apiPath(`/accounts/vouchers/export?type=${type}`),
   concessions: (studentId = 0, year = "") => request<{ data: any[] }>(`/accounts/concessions?studentId=${studentId}&year=${year}`),
   createConcession: (payload: any) => request<{ data: any }>("/accounts/concessions", { method: "POST", body: JSON.stringify(payload) }),
   approveConcession: (id: number) => request<{ data: any }>(`/accounts/concessions/${id}/approve`, { method: "PATCH" }),
   rejectConcession: (id: number) => request<{ data: any }>(`/accounts/concessions/${id}/reject`, { method: "PATCH" }),
   dailyCollection: (date = "") => request<{ data: any }>(`/accounts/reports/daily-collection?date=${date}`),
   feeDefaulters: (year = "") => request<{ data: any[] }>(`/accounts/reports/fee-defaulters?year=${year}`),
-  feeDefaultersExport: (year = "") => `/api/accounts/reports/fee-defaulters/export?year=${year}`,
+  feeDefaultersExport: (year = "") => apiPath(`/accounts/reports/fee-defaulters/export?year=${year}`),
   monthlyCollection: (month = "") => request<{ data: any }>(`/accounts/reports/monthly-collection?month=${month}`),
   expenseReport: (month = "") => request<{ data: any }>(`/accounts/reports/expense?month=${month}`),
   cashFlow: (startDate = "", endDate = "") => request<{ data: any }>(`/accounts/reports/cash-flow?startDate=${startDate}&endDate=${endDate}`),
@@ -174,7 +169,7 @@ export const api = {
   removeEventParticipant: (eventId: number, studentId: number) => request<{ data: any }>(`/events/${eventId}/participants/${studentId}`, { method: "DELETE" }),
   updateAttendance: (id: number, records: any[]) => request<{ data: any }>(`/events/${id}/attendance`, { method: "PATCH", body: JSON.stringify({ records }) }),
   uploadEventMedia: (id: number, payload: FormData) => request<{ data: any }>(`/events/${id}/media`, { method: "POST", body: payload }),
-  downloadEventMedia: (id: number) => `/api/events/media/${id}/download`,
+  downloadEventMedia: (id: number) => apiPath(`/events/media/${id}/download`),
   deleteEventMedia: (id: number) => request<{ data: any }>(`/events/media/${id}`, { method: "DELETE" }),
   eventFolders: (eventId: number) => request<{ data: any[] }>(`/events/${eventId}/folders`),
   createEventFolder: (eventId: number, payload: any) => request<{ data: any }>(`/events/${eventId}/folders`, { method: "POST", body: JSON.stringify(payload) }),
@@ -186,33 +181,33 @@ export const api = {
 
   // Reports
   enrollmentReport: (from = "", to = "") => request<{ data: any[] }>(`/reports/students/enrollment${buildDateQuery(from, to)}`),
-  enrollmentReportExport: (from = "", to = "") => `/api/reports/students/enrollment/export${buildDateQuery(from, to)}`,
+  enrollmentReportExport: (from = "", to = "") => apiPath(`/reports/students/enrollment/export${buildDateQuery(from, to)}`),
   statusReport: (from = "", to = "") => request<{ data: any[] }>(`/reports/students/status${buildDateQuery(from, to)}`),
-  statusReportExport: (from = "", to = "") => `/api/reports/students/status/export${buildDateQuery(from, to)}`,
+  statusReportExport: (from = "", to = "") => apiPath(`/reports/students/status/export${buildDateQuery(from, to)}`),
   feeCollectionReport: (year = "", from = "", to = "") => request<{ data: any[] }>(`/reports/fees/collection?year=${year}${buildDateQuery(from, to)}`),
-  feeCollectionReportExport: (year = "", from = "", to = "") => `/api/reports/fees/collection/export?year=${year}${buildDateQuery(from, to)}`,
+  feeCollectionReportExport: (year = "", from = "", to = "") => apiPath(`/reports/fees/collection/export?year=${year}${buildDateQuery(from, to)}`),
   certificateReport: (from = "", to = "") => request<{ data: any[] }>(`/reports/certificates${buildDateQuery(from, to)}`),
-  certificateReportExport: (from = "", to = "") => `/api/reports/certificates/export${buildDateQuery(from, to)}`,
+  certificateReportExport: (from = "", to = "") => apiPath(`/reports/certificates/export${buildDateQuery(from, to)}`),
   financialSummary: (date = "") => request<{ data: any }>(`/reports/financial/summary?date=${date}`),
-  financialSummaryExport: (from = "", to = "") => `/api/reports/financial/summary/export${buildDateQuery(from, to)}`,
+  financialSummaryExport: (from = "", to = "") => apiPath(`/reports/financial/summary/export${buildDateQuery(from, to)}`),
   eventReport: (from = "", to = "") => request<{ data: any[] }>(`/reports/events/summary${buildDateQuery(from, to)}`),
-  eventReportExport: (from = "", to = "") => `/api/reports/events/summary/export${buildDateQuery(from, to)}`,
+  eventReportExport: (from = "", to = "") => apiPath(`/reports/events/summary/export${buildDateQuery(from, to)}`),
   documentReport: (from = "", to = "") => request<{ data: any[] }>(`/reports/documents/summary${buildDateQuery(from, to)}`),
-  documentReportExport: (from = "", to = "") => `/api/reports/documents/summary/export${buildDateQuery(from, to)}`,
+  documentReportExport: (from = "", to = "") => apiPath(`/reports/documents/summary/export${buildDateQuery(from, to)}`),
 
   // Attendance Report
   attendanceReport: (from = "", to = "") => request<{ data: any[] }>(`/reports/attendance${buildDateQuery(from, to)}`),
-  attendanceReportExport: (from = "", to = "") => `/api/reports/attendance/export${buildDateQuery(from, to)}`,
+  attendanceReportExport: (from = "", to = "") => apiPath(`/reports/attendance/export${buildDateQuery(from, to)}`),
   attendanceSummary: (from = "", to = "") => request<{ data: any[] }>(`/reports/attendance/summary${buildDateQuery(from, to)}`),
 
   // Staff Report
   staffReport: (role = "") => request<{ data: any[] }>(`/reports/staff${role ? `?role=${role}` : ""}`),
-  staffReportExport: (role = "") => `/api/reports/staff/export${role ? `?role=${role}` : ""}`,
+  staffReportExport: (role = "") => apiPath(`/reports/staff/export${role ? `?role=${role}` : ""}`),
   staffSummary: () => request<{ data: any[] }>("/reports/staff/summary"),
 
   // Parent Report
   parentReport: () => request<{ data: any[] }>("/reports/parents"),
-  parentReportExport: () => "/api/reports/parents/export",
+  parentReportExport: () => apiPath("/reports/parents/export"),
 
   // Custom Report Builder
   customReport: (config: any) => request<{ data: any }>("/reports/custom", { method: "POST", body: JSON.stringify(config) }),
@@ -272,7 +267,7 @@ export const api = {
 };
 
 export type DashboardData = {
-  totals: { students: number; active: number; schools: number; pendingCertificates: number };
+  totals: { students: number; active: number; events: number; fees: number; certificates: number; schools: number; pendingCertificates: number };
   enrollmentByClass: { label: string; value: number }[];
   recent: { title: string; meta: string; time: string }[];
 };

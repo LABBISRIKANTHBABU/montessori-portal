@@ -9,13 +9,12 @@ process.env.DB_USER = "test";
 process.env.DB_PASSWORD = "test";
 process.env.DB_NAME = "test";
 process.env.FRONTEND_ORIGIN = "http://localhost:5173";
-process.env.DEMO_MODE = "false";
 
 // ─── Student Repository ────────────────────────────────────────────────
 
 test("listStudents returns filtered results by search", async () => {
   const repo = await import("../src/repository.js");
-  // Create students first since demo mockStudents starts empty
+  // Create records required by this database integration test.
   await repo.createStudent({
     admissionNo: "SEARCH-TEST-1", fullName: "Alpha Student",
     classAdmitted: "III", dateOfBirth: "2016-01-15", residenceAddress: "123 Street", confirmed: "on",
@@ -52,7 +51,7 @@ test("listStudents respects pagination", async () => {
   }
 });
 
-test("createStudent in demo mode populates mockStudents", async () => {
+test("createStudent persists a database record", async () => {
   const repo = await import("../src/repository.js");
   const before = await repo.listStudents(1, "", "", 200, 0);
   await repo.createStudent({
@@ -109,7 +108,7 @@ test("getDashboard returns correct counts and structure", async () => {
   assert.equal(typeof dashboard.totals.students, "number", "students count should be a number");
   assert.equal(typeof dashboard.totals.active, "number", "active count should be a number");
   assert.equal(typeof dashboard.totals.schools, "number", "schools count should be a number");
-  assert.ok(dashboard.totals.students > 0, "Should have at least 1 student in demo");
+  assert.ok(dashboard.totals.students > 0, "Should have at least 1 student");
   assert.ok(Array.isArray(dashboard.enrollmentByClass), "enrollmentByClass should be an array");
   assert.ok(dashboard.enrollmentByClass.length > 0, "Should have enrollment data");
   assert.ok(Array.isArray(dashboard.recent), "recent activity should be an array");

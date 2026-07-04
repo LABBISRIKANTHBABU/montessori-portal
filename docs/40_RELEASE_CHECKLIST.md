@@ -221,7 +221,7 @@ Every item must be verified before Version 1.0 is considered ready.
 
 ## Environment
 
-- [ ] DEMO_MODE=false for production
+- [ ] Dashboard and all modules read only from the configured production database
 - [ ] JWT_SECRET is 32+ character random string
 - [ ] DATA_ENCRYPTION_KEY is base64-encoded 32-byte key
 - [ ] FRONTEND_ORIGIN matches deployed URL

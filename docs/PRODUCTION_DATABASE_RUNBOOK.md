@@ -8,7 +8,6 @@ Never use the production database as the first migration target.
 
 ## Required environment values
 
-- `DEMO_MODE=false`
 - `JWT_SECRET`: at least 32 random characters
 - `DATA_ENCRYPTION_KEY`: a base64-encoded 32-byte key
 - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`

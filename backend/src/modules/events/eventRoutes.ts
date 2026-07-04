@@ -1,7 +1,7 @@
 /**
  * Module 7: Events
  * Event scheduling, participation, attendance, media archive, dashboard, archive, folders, budgets.
- * All data access goes through repository.ts for centralized DEMO_MODE switching.
+ * All data access goes through repository.ts.
  */
 
 import { Router } from "express";

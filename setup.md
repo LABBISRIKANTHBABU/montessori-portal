@@ -40,7 +40,6 @@ Create `backend/.env`:
 ```env
 PORT=4000
 NODE_ENV=production
-DEMO_MODE=false
 JWT_SECRET=your-32-char-random-secret-here-change-this
 DATA_ENCRYPTION_KEY=base64-encoded-32-byte-key
 DB_HOST=your-hostinger-mysql-host

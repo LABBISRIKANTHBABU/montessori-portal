@@ -20,7 +20,7 @@ await withTransaction(async connection => {
   );
   if (!users[0]) throw new Error("No active v2 account exists for this email.");
   const [updated] = await connection.execute<ResultSetHeader>(
-    "UPDATE v2_users SET password_hash = ?, force_password_reset = 1, is_active = 1 WHERE id = ?",
+    "UPDATE v2_users SET password_hash = ?, force_password_reset = 0, is_active = 1 WHERE id = ?",
     [passwordHash, users[0].id]
   );
   if (updated.affectedRows !== 1) throw new Error("Password reset did not update exactly one account.");
@@ -32,5 +32,4 @@ await withTransaction(async connection => {
 });
 console.log(`Password reset for ${email}.`);
 console.log(`Temporary password: ${temporaryPassword}`);
-console.log("Copy it now. It is shown once and must be changed at first login.");
-
+console.log("Copy it now. It is shown once.");

@@ -20,7 +20,7 @@ import ReportsPage from "./features/reports/ReportsPage";
 import UsersPageFull from "./features/users/UsersPage";
 import SettingsPage from "./features/settings/SettingsPage";
 
-type Session = { user: { name: string; role: string }; school: School; mustChangePassword?: boolean } | null;
+type Session = { user: { name: string; role: string }; school: School } | null;
 
 // ─── Error Boundary ─────────────────────────────────────────────────────
 
@@ -136,8 +136,7 @@ function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/login/:schoolId" element={session ? <Navigate to="/dashboard" /> : <Login onLogin={signIn} isSuperAdmin={false} />} />
             <Route path="/super-admin" element={session ? <Navigate to="/dashboard" /> : <Login onLogin={signIn} isSuperAdmin={true} />} />
-            <Route path="/change-password" element={session ? <ChangePassword session={session} onComplete={() => signIn({ ...session, mustChangePassword: false })} /> : <Navigate to="/" />} />
-            <Route path="/*" element={session ? (session.mustChangePassword ? <Navigate to="/change-password" /> : <Portal session={session} onLogout={signOut} />) : <Navigate to="/" />} />
+            <Route path="/*" element={session ? <Portal session={session} onLogout={signOut} /> : <Navigate to="/" />} />
           </Routes>
         </Suspense>
       </ToastProvider>
@@ -232,8 +231,8 @@ function Login({ onLogin, isSuperAdmin }: { onLogin: (session: NonNullable<Sessi
     try {
       const result = await api.login({ schoolId: isSuperAdmin ? 0 : schoolId, email, password });
       token.set(result.token);
-      onLogin({ user: result.user, school: result.school, mustChangePassword: result.mustChangePassword });
-      navigate(result.mustChangePassword ? "/change-password" : "/dashboard");
+      onLogin({ user: result.user, school: result.school });
+      navigate("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in. Please check your credentials.");
     } finally { setLoading(false); }
@@ -280,54 +279,6 @@ function Login({ onLogin, isSuperAdmin }: { onLogin: (session: NonNullable<Sessi
 }
 
 // ─── Change Password ─────────────────────────────────────────────────────
-
-function ChangePassword({ session, onComplete }: { session: NonNullable<Session>; onComplete: () => void }) {
-  const navigate = useNavigate();
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const values = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
-    if (values.newPassword !== values.confirmPassword) return setError("New passwords do not match.");
-    setLoading(true); setError("");
-    try {
-      const result = await api.changePassword({ currentPassword: values.currentPassword, newPassword: values.newPassword });
-      token.set(result.token);
-      onComplete();
-      navigate("/dashboard");
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Password change failed.");
-    } finally { setLoading(false); }
-  }
-
-  return (
-    <main className="login-page">
-      <section className="login-intro">
-        <Brand light />
-        <div>
-          <span className="eyebrow light">SECURE YOUR ACCOUNT</span>
-          <h1>One careful first step.</h1>
-          <p>Create a private password before entering {session.school.name}.</p>
-        </div>
-      </section>
-      <section className="login-panel">
-        <form onSubmit={submit}>
-          <span className="step-label">REQUIRED ON FIRST LOGIN</span>
-          <h2>Change password</h2>
-          <p className="muted">Use 4+ characters.</p>
-          <label>Current password<input name="currentPassword" type="password" required /></label>
-          <label>New password<input name="newPassword" type="password" minLength={4} required /></label>
-          <label>Confirm new password<input name="confirmPassword" type="password" minLength={4} required /></label>
-          {error && <div className="form-error">{error}</div>}
-          <button className="primary-button wide" disabled={loading}>
-            {loading ? "Securing..." : "Secure account"} <ArrowRight size={18} />
-          </button>
-        </form>
-      </section>
-    </main>
-  );
-}
 
 // ─── Navigation Config ───────────────────────────────────────────────────
 
@@ -597,12 +548,16 @@ function Dashboard({ session }: { session: NonNullable<Session> }) {
   const [data, setData] = useState<any>(null);
   const [extData, setExtData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const role = session.user.role;
 
   useEffect(() => {
-    Promise.all([api.dashboard(), api.dashboardExtended()])
-      .then(([base, ext]) => { setData(base.data); setExtData(ext.data); })
-      .catch(() => undefined)
+    Promise.allSettled([api.dashboard(), api.dashboardExtended()])
+      .then(([base, ext]) => {
+        if (base.status === "fulfilled") setData(base.value.data);
+        else setLoadError(base.reason instanceof Error ? base.reason.message : "Dashboard data could not be loaded.");
+        if (ext.status === "fulfilled") setExtData(ext.value.data);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -632,7 +587,9 @@ function Dashboard({ session }: { session: NonNullable<Session> }) {
         )}
       </div>
 
-      {loading ? (
+      {loadError ? (
+        <div className="form-error" role="alert">{loadError}</div>
+      ) : loading ? (
         <section className="metrics">
           <Metric label="Loading..." value="..." note="Fetching data" icon={Users} />
         </section>
@@ -643,7 +600,7 @@ function Dashboard({ session }: { session: NonNullable<Session> }) {
               <Metric
                 key={i}
                 label={w.label}
-                value={extData ? (w.key ? extData[w.key] : undefined) ?? (w.altKey ? data?.totals?.[w.altKey] : undefined) ?? "—" : (w.altKey ? data?.totals?.[w.altKey] : undefined) ?? "—"}
+                value={dashboardMetricValue(w, data, extData)}
                 note={w.note}
                 icon={w.icon}
                 accent={w.accent}
@@ -759,10 +716,10 @@ function getRoleWidgets(role: string) {
   switch (role) {
     case "School Admin":
       return [
-        { label: "Total students", key: "totalStudents", altKey: "students", note: "All enrolled", icon: Users },
-        { label: "Active today", key: "activeStudents", altKey: "active", note: "Currently active", icon: UserRound },
-        { label: "Fees collected today", key: "feesCollectedToday", note: "Daily collection", icon: WalletCards },
-        { label: "Pending tasks", key: "pendingCertificates", altKey: "pendingCertificates", note: "Requires action", icon: Award, accent: true },
+        { label: "Students", altKey: "students", note: "All enrolled", icon: Users },
+        { label: "Events", altKey: "events", note: "All school events", icon: Calendar },
+        { label: "Fees", altKey: "fees", note: "Total collected", icon: WalletCards, currency: true },
+        { label: "Certificates", altKey: "certificates", note: "All generated", icon: Award, accent: true },
       ];
     case "Principal":
       return [
@@ -807,6 +764,13 @@ function getRoleWidgets(role: string) {
         { label: "TC requests", key: "pendingCertificates", altKey: "pendingCertificates", note: "Awaiting approval", icon: Award, accent: true },
       ];
   }
+}
+
+function dashboardMetricValue(widget: { key?: string; altKey?: string; currency?: boolean }, data: any, extData: any) {
+  const value = (widget.key ? extData?.[widget.key] : undefined)
+    ?? (widget.altKey ? data?.totals?.[widget.altKey] : undefined)
+    ?? 0;
+  return widget.currency ? `₹${Number(value).toLocaleString("en-IN")}` : value;
 }
 
 function getQuickActions(role: string, navigate: any) {

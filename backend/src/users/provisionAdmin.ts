@@ -26,7 +26,7 @@ const result = await withTransaction(async connection => {
   const [existing] = await connection.execute<RowDataPacket[]>("SELECT id FROM v2_users WHERE LOWER(email) = LOWER(?) LIMIT 1", [email]);
   if (existing.length) throw new Error("A v2 user with this email already exists.");
   const [created] = await connection.execute<ResultSetHeader>(
-    "INSERT INTO v2_users (name, email, password_hash, is_active, force_password_reset) VALUES (?, ?, ?, 1, 1)",
+    "INSERT INTO v2_users (name, email, password_hash, is_active, force_password_reset) VALUES (?, ?, ?, 1, 0)",
     [name, email, passwordHash]
   );
   await connection.execute(
@@ -43,5 +43,4 @@ const result = await withTransaction(async connection => {
 console.log(`Administrator created for ${result.school}.`);
 console.log(`Email: ${email}`);
 console.log(`Temporary password: ${temporaryPassword}`);
-console.log("Copy it now. It is shown once and must be changed at first login.");
-
+console.log("Copy it now. It is shown once.");

@@ -9,7 +9,6 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { getPool, query } from "../../database/pool.js";
 import { requirePermission, rolePermissions } from "../../security/permissions.js";
-import { validatePasswordPolicy } from "../../security/passwordPolicy.js";
 import type { AuthRequest } from "../../types/auth.js";
 import type { RowDataPacket } from "mysql2/promise";
 
@@ -47,7 +46,7 @@ router.get("/", requirePermission("user.manage"), async (req: AuthRequest, res, 
 router.get("/:id", requirePermission("user.manage"), async (req: AuthRequest, res, next) => {
   try {
     const [rows] = await query(
-      `SELECT u.id, u.name, u.email, u.is_active active, u.force_password_reset forcePasswordReset,
+      `SELECT u.id, u.name, u.email, u.is_active active,
               usr.role_code roleCode, u.last_login_at lastLoginAt, u.created_at createdAt
        FROM v2_users u JOIN v2_user_school_roles usr ON usr.user_id = u.id
        WHERE u.id = ? AND usr.school_id = ?`,
@@ -65,9 +64,6 @@ router.post("/", requirePermission("user.manage"), async (req: AuthRequest, res,
     password: z.string(), roleCode: z.string().min(1)
   }).safeParse(req.body);
   if (!parsed.success) return res.status(422).json({ message: "Provide name, email, password, and role." });
-  const policy = validatePasswordPolicy(parsed.data.password);
-  if (!policy.valid) return res.status(422).json({ message: policy.errors[0] });
-
   try {
     // Check duplicate email
     const [existing] = await query(
@@ -77,7 +73,7 @@ router.post("/", requirePermission("user.manage"), async (req: AuthRequest, res,
 
     const passwordHash = await bcrypt.hash(parsed.data.password, 12);
     const [result] = await query(
-      "INSERT INTO v2_users (name, email, password_hash, force_password_reset) VALUES (?, ?, ?, 1)",
+      "INSERT INTO v2_users (name, email, password_hash, force_password_reset) VALUES (?, ?, ?, 0)",
       [parsed.data.name, parsed.data.email, passwordHash]
     );
     const userId = (result as any).insertId;
@@ -152,21 +148,19 @@ router.patch("/:id/activate", requirePermission("user.manage"), async (req: Auth
 router.post("/:id/reset-password", requirePermission("user.manage"), async (req: AuthRequest, res, next) => {
   const parsed = z.object({ newPassword: z.string() }).safeParse(req.body);
   if (!parsed.success) return res.status(422).json({ message: "Provide a new password." });
-  const policy = validatePasswordPolicy(parsed.data.newPassword);
-  if (!policy.valid) return res.status(422).json({ message: policy.errors[0] });
   try {
     const targetUserId = Number(req.params.id);
     const isMember = await verifySchoolMembership(req.auth!.schoolId, targetUserId);
     if (!isMember) return res.status(404).json({ message: "User not found in this school." });
 
     const hash = await bcrypt.hash(parsed.data.newPassword, 12);
-    await query("UPDATE v2_users SET password_hash = ?, force_password_reset = 1 WHERE id = ?", [hash, targetUserId]);
+    await query("UPDATE v2_users SET password_hash = ?, force_password_reset = 0 WHERE id = ?", [hash, targetUserId]);
     await query(
       `INSERT INTO v2_audit_events (school_id, user_id, entity_type, entity_id, action_name, metadata_json)
        VALUES (?, ?, 'user', ?, 'user.reset_password', JSON_OBJECT('target_user', ?))`,
       [req.auth!.schoolId, req.auth!.userId, targetUserId, targetUserId]
     );
-    res.json({ data: { message: "Password reset. User must change on next login." } });
+    res.json({ data: { message: "Password reset successfully." } });
   } catch (error) { next(error); }
 });
 
