@@ -639,19 +639,6 @@ app.use("/api/users", authenticate, userRoutes);
 
 app.use("/api/settings", authenticate, settingRoutes);
 
-// ─── Frontend static files (Hostinger deployment) ────────────────────────
-
-if (config.NODE_ENV === "production") {
-  const frontendDist = path.join(process.cwd(), "frontend/dist");
-  app.use(express.static(frontendDist));
-  app.get("/*splat", (req, res, next) => {
-    if (!req.path.startsWith("/api/")) {
-      res.sendFile(path.join(frontendDist, "index.html"));
-    } else {
-      next();
-    }
-  });
-}
 
 // ─── 404 & Error Handler ────────────────────────────────────────────────
 
