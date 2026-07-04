@@ -1154,3 +1154,70 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   transition: top 0.2s;
 }
 .skip-link:focus { top: 0; }
+
+/* Group command centre */
+.campus-switcher{
+  width:100%;margin:3px 0 0;padding:0;border:0;background:transparent;color:#fff;
+  font-size:11px;font-weight:700;line-height:1.35;box-shadow:none;cursor:pointer
+}
+.campus-switcher option{color:#173f35;background:#fff}
+.super-command{position:relative}
+.super-command:before{
+  content:"";position:absolute;inset:0 0 auto;height:270px;z-index:-1;opacity:.65;
+  background:radial-gradient(circle at 78% 15%,rgba(233,182,67,.2),transparent 28%),linear-gradient(135deg,rgba(23,63,53,.07),transparent 60%)
+}
+.command-title{align-items:center}
+.command-title h1{max-width:700px}
+.scope-seal{
+  width:min(360px,100%);display:flex;gap:14px;align-items:flex-start;padding:18px;
+  color:#f7f3e8;background:var(--forest);border:1px solid rgba(255,255,255,.13);
+  border-radius:8px;box-shadow:12px 12px 0 #e5b847
+}
+.scope-seal svg{color:#e8b94c;flex:none}
+.scope-seal small,.scope-seal strong,.scope-seal span{display:block}
+.scope-seal small{font-size:8px;letter-spacing:.17em;color:#a9c0b6}
+.scope-seal strong{font:600 17px "Playfair Display";margin:4px 0}
+.scope-seal span{font-size:10px;color:#bdd0c7}
+.access-contract{
+  margin-top:16px;padding:22px 24px;display:grid;grid-template-columns:minmax(220px,.7fr) 1.3fr;
+  gap:28px;align-items:center;border:1px solid #ded8c9;border-radius:8px;background:#fffdf8
+}
+.access-contract.group{background:linear-gradient(110deg,#173f35 0 32%,#204d41 32%);color:#fff;border-color:#173f35}
+.access-contract.school{border-left:5px solid #d69d2e}
+.access-contract-intro{display:flex;align-items:center;gap:14px}
+.access-contract-intro>svg{color:#e8b94c}
+.access-contract-intro span{font-size:8px;letter-spacing:.16em;font-weight:800;color:#9bb7ab}
+.access-contract-intro h2{font:600 24px "Playfair Display";margin:3px 0 0}
+.access-rules{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px}
+.access-rules span{display:flex;align-items:flex-start;gap:8px;font-size:11px;line-height:1.45}
+.access-rules svg{color:#e8b94c;flex:none;margin-top:1px}
+.campus-portfolio{margin-top:22px}
+.portfolio-heading{display:flex;justify-content:space-between;align-items:end;margin:0 0 13px}
+.portfolio-heading h2{font:600 29px "Playfair Display";margin:5px 0 0}
+.portfolio-heading>span{font-size:10px;color:var(--muted);letter-spacing:.08em}
+.campus-ops-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.campus-ops-card{
+  min-height:310px;padding:21px;display:flex;flex-direction:column;background:#fff;border:1px solid #ded9cc;
+  border-radius:8px;box-shadow:0 10px 35px rgba(23,63,53,.045);transition:transform .2s,border-color .2s,box-shadow .2s
+}
+.campus-ops-card:hover{transform:translateY(-3px);box-shadow:0 16px 38px rgba(23,63,53,.1)}
+.campus-ops-card.selected{border:2px solid #d6a42f;background:linear-gradient(145deg,#fffdf8,#f8f1d9)}
+.campus-ops-top{display:flex;justify-content:space-between;align-items:center}
+.campus-index{font:600 28px "Playfair Display";color:#b9b2a1}
+.live-scope{font-size:8px;letter-spacing:.13em;font-weight:800;color:#173f35;background:#e8c55d;padding:5px 8px;border-radius:20px}
+.campus-ops-card h3{font:600 21px/1.15 "Playfair Display";margin:13px 0 7px}
+.campus-ops-card>p{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted)}
+.campus-mini-metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0 18px}
+.campus-mini-metrics span{padding:9px;background:#f4f1e8;border-radius:5px;color:var(--muted);font-size:9px}
+.campus-mini-metrics strong{display:block;color:var(--ink);font-size:14px;margin-bottom:2px}
+.campus-card-actions{display:flex;gap:8px;margin-top:auto}
+.campus-card-actions .primary-button,.campus-card-actions .secondary-button{padding:9px 11px;font-size:10px;box-shadow:none}
+
+@media(max-width:1100px){
+  .campus-ops-grid{grid-template-columns:1fr 1fr}
+  .access-contract{grid-template-columns:1fr}
+}
+@media(max-width:700px){
+  .campus-ops-grid,.access-rules{grid-template-columns:1fr}
+  .scope-seal{box-shadow:6px 6px 0 #e5b847}
+}

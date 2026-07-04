@@ -13,6 +13,7 @@ import { getConfig } from "./config/env.js";
 import { databaseHealth } from "./database/pool.js";
 import { requirePermission, requireRole, rolePermissions } from "./security/permissions.js";
 import { verifyAccessToken } from "./security/accessToken.js";
+import { resolveSchoolScope } from "./security/schoolScope.js";
 import type { AuthRequest } from "./types/auth.js";
 import type { RowDataPacket } from "mysql2/promise";
 import { parseStudentWorkbook, validateRows } from "./modules/imports/importService.js";
@@ -117,28 +118,27 @@ async function authenticate(req: AuthRequest, res: Response, next: NextFunction)
   try {
     const payload = await verifyAccessToken(bearer);
     const homeSchoolId = Number(payload.schoolId);
-    let effectiveSchoolId = homeSchoolId;
-    const requestedSchool = req.header("x-school-id");
-    if (requestedSchool !== undefined) {
-      const parsedSchoolId = Number(requestedSchool);
-      if (!Number.isInteger(parsedSchoolId) || parsedSchoolId <= 0) {
-        return res.status(422).json({ message: "Select a valid school." });
-      }
-      if (String(payload.role) !== "group_super_admin" && parsedSchoolId !== homeSchoolId) {
-        return res.status(403).json({ message: "School administrators may access only their assigned school." });
-      }
-      if (String(payload.role) === "group_super_admin" && !(await repo.getSchoolById(parsedSchoolId))) {
-        return res.status(404).json({ message: "School not found." });
-      }
-      effectiveSchoolId = parsedSchoolId;
-    }
+    const effectiveSchoolId = await resolveSchoolScope({
+      role: String(payload.role),
+      homeSchoolId,
+      requestedSchoolId: req.header("x-school-id"),
+      schoolExists: async schoolId => Boolean(await repo.getSchoolById(schoolId)),
+    });
     req.auth = {
       userId: Number(payload.sub), schoolId: effectiveSchoolId, homeSchoolId, role: String(payload.role),
       permissions: Array.isArray(payload.permissions) ? payload.permissions.map(String) : (rolePermissions[String(payload.role)] || []),
       sessionId: undefined
     };
     next();
-  } catch { res.status(401).json({ message: "Invalid or expired authentication token." }); }
+  } catch (error) {
+    const typedError = error as Error & { statusCode?: number; code?: string };
+    const statusCode = Number(typedError.statusCode);
+    if (statusCode >= 400 && statusCode < 500) return res.status(statusCode).json({ message: (error as Error).message });
+    if (String(typedError.code || "").startsWith("ERR_J")) {
+      return res.status(401).json({ message: "Invalid or expired authentication token." });
+    }
+    next(error);
+  }
 }
 
 // ─── Health ──────────────────────────────────────────────────────────────

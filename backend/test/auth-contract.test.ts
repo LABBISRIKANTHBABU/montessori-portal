@@ -46,3 +46,27 @@ test("tampered access token is rejected", async () => {
   });
   await assert.rejects(() => verifyAccessToken(`${token.slice(0, -1)}x`));
 });
+
+test("school administrator cannot escape the assigned school", async () => {
+  const { resolveSchoolScope } = await import("../src/security/schoolScope.js");
+  await assert.rejects(
+    () => resolveSchoolScope({ role: "school_admin", homeSchoolId: 1, requestedSchoolId: "2", schoolExists: async () => true }),
+    (error: Error & { statusCode?: number }) => error.statusCode === 403
+  );
+});
+
+test("group super administrator can select any existing school", async () => {
+  const { resolveSchoolScope } = await import("../src/security/schoolScope.js");
+  const selected = await resolveSchoolScope({
+    role: "group_super_admin", homeSchoolId: 1, requestedSchoolId: "9", schoolExists: async schoolId => schoolId === 9,
+  });
+  assert.equal(selected, 9);
+});
+
+test("group super administrator cannot select a missing school", async () => {
+  const { resolveSchoolScope } = await import("../src/security/schoolScope.js");
+  await assert.rejects(
+    () => resolveSchoolScope({ role: "group_super_admin", homeSchoolId: 1, requestedSchoolId: "999", schoolExists: async () => false }),
+    (error: Error & { statusCode?: number }) => error.statusCode === 404
+  );
+});

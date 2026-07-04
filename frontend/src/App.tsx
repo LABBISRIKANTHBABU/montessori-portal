@@ -6,7 +6,7 @@ import {
   Upload, UserRound, Users, WalletCards, X, Shield, Building2, CheckCircle2,
   AlertTriangle, Clock, CreditCard, FileText
 } from "lucide-react";
-import { api, DashboardData, School, SearchResult, Notification, token } from "./api";
+import { api, DashboardData, GroupOverview, School, SearchResult, Notification, schoolScope, token } from "./api";
 import { ToastProvider } from "./components/Toast";
 import StudentCreatePage from "./features/students/StudentCreatePage";
 import StudentsPage from "./features/students/StudentsPage";
@@ -118,12 +118,15 @@ function App() {
     return raw ? JSON.parse(raw) : null;
   });
   const signIn = (next: NonNullable<Session>) => {
+    if (next.user.role === "Group Super Admin") schoolScope.set(next.school.id);
+    else schoolScope.clear();
     setSession(next);
     localStorage.setItem("monte_session", JSON.stringify(next));
   };
   const signOut = () => {
     void api.logout().catch(() => undefined);
     token.clear();
+    schoolScope.clear();
     localStorage.removeItem("monte_session");
     setSession(null);
   };
@@ -297,8 +300,14 @@ const navItems = [
 const superAdminNavItems = [
   ["dashboard", "Platform Overview", LayoutDashboard],
   ["schools", "Campuses", GraduationCap],
+  ["students", "Students", Users],
+  ["certificates", "Certificates", FileBadge2],
+  ["fees", "Fees & Accounts", WalletCards],
+  ["documents", "Documents", FileText],
+  ["events", "Events", Calendar],
   ["users", "Staff & Roles", Users],
-  ["reports", "Global Reports", BarChart3]
+  ["reports", "Global Reports", BarChart3],
+  ["settings", "School Settings", Settings],
 ] as const;
 
 // ─── Portal (Main App Shell) ─────────────────────────────────────────────
@@ -312,6 +321,30 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
   const managingImports = location.pathname === "/students/imports";
   const studentId = /^\/students\/(\d+)$/.exec(location.pathname)?.[1];
   const isSuperAdmin = session.user.role === "Group Super Admin";
+  const [availableSchools, setAvailableSchools] = useState<School[]>([session.school]);
+  const [activeSchool, setActiveSchool] = useState<School>(session.school);
+  const scopedSession = { ...session, school: activeSchool };
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    api.schools().then(({ data }) => {
+      setAvailableSchools(data);
+      const savedId = Number(schoolScope.get());
+      const selected = data.find(school => school.id === savedId) || data.find(school => school.id === session.school.id) || data[0];
+      if (selected) {
+        schoolScope.set(selected.id);
+        setActiveSchool(selected);
+      }
+    }).catch(() => undefined);
+  }, [isSuperAdmin, session.school.id]);
+
+  const selectCampus = (school: School, destination?: string) => {
+    schoolScope.set(school.id);
+    setActiveSchool(school);
+    setSearchQuery("");
+    setSearchResults([]);
+    if (destination) navigate(destination);
+  };
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -339,7 +372,7 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
       setNotifications(r.data.notifications);
       setUnreadCount(r.data.unreadCount);
     }).catch(() => undefined);
-  }, [current]);
+  }, [current, activeSchool.id]);
 
   const handleSearch = useCallback((value: string) => {
     setSearchQuery(value);
@@ -369,8 +402,23 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
           <button className="icon-button mobile-only" onClick={() => setMenu(false)}><X /></button>
         </div>
         <div className="campus-card">
-          <span className="campus-mark">{session.school.code.slice(0, 2)}</span>
-          <div><small>CURRENT CAMPUS</small><strong>{session.school.name}</strong></div>
+          <span className="campus-mark">{activeSchool.code.slice(0, 2)}</span>
+          <div>
+            <small>{isSuperAdmin ? "OPERATING CAMPUS" : "ASSIGNED CAMPUS"}</small>
+            {isSuperAdmin ? (
+              <select
+                className="campus-switcher"
+                aria-label="Operating campus"
+                value={activeSchool.id}
+                onChange={event => {
+                  const selected = availableSchools.find(school => school.id === Number(event.target.value));
+                  if (selected) selectCampus(selected);
+                }}
+              >
+                {availableSchools.map(school => <option key={school.id} value={school.id}>{school.name}</option>)}
+              </select>
+            ) : <strong>{activeSchool.name}</strong>}
+          </div>
         </div>
         <nav>
           <span className="nav-label">WORKSPACE</span>
@@ -479,19 +527,23 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
             <span className="year-pill">2026–27 <ChevronDown size={15} /></span>
           </div>
         </header>
-        {current === "dashboard" && (isSuperAdmin ? <SuperAdminDashboard session={session} /> : <Dashboard session={session} />)}
-        {current === "students" && (creatingStudent ? <StudentCreatePage school={session.school} /> : managingImports ? <ImportPage /> : studentId ? <StudentProfilePage id={Number(studentId)} /> : <StudentsPage />)}
-        {current === "schools" && <SchoolsPage />}
-        {current === "users" && <UsersPageFull />}
-        {current === "certificates" && <CertificatesPage />}
-        {current === "fees" && <AccountsPage />}
-        {current === "documents" && <DocumentsPage />}
-        {current === "events" && <EventsPage />}
-        {current === "reports" && <ReportsPage />}
-        {current === "settings" && <SettingsPage />}
-        {!["dashboard", "students", "schools", "users", "certificates", "fees", "documents", "events", "reports", "settings"].includes(current) && (
-          <ModulePlaceholder name={(isSuperAdmin ? superAdminNavItems : navItems).find(n => n[0] === current)?.[1] || "Module"} />
-        )}
+        <React.Fragment key={`${activeSchool.id}:${current}`}>
+          {current === "dashboard" && (isSuperAdmin
+            ? <SuperAdminDashboard session={scopedSession} activeSchool={activeSchool} onSelectCampus={selectCampus} />
+            : <Dashboard session={scopedSession} />)}
+          {current === "students" && (creatingStudent ? <StudentCreatePage school={activeSchool} /> : managingImports ? <ImportPage /> : studentId ? <StudentProfilePage id={Number(studentId)} /> : <StudentsPage />)}
+          {current === "schools" && isSuperAdmin && <SchoolsPage activeSchoolId={activeSchool.id} onSelectCampus={selectCampus} />}
+          {current === "users" && <UsersPageFull />}
+          {current === "certificates" && <CertificatesPage />}
+          {current === "fees" && <AccountsPage />}
+          {current === "documents" && <DocumentsPage />}
+          {current === "events" && <EventsPage />}
+          {current === "reports" && <ReportsPage />}
+          {current === "settings" && <SettingsPage />}
+          {!["dashboard", "students", "schools", "users", "certificates", "fees", "documents", "events", "reports", "settings"].includes(current) && (
+            <ModulePlaceholder name={(isSuperAdmin ? superAdminNavItems : navItems).find(n => n[0] === current)?.[1] || "Module"} />
+          )}
+        </React.Fragment>
       </main>
     </div>
   );
@@ -500,44 +552,133 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
 // ─── Super Admin Dashboard ───────────────────────────────────────────────
 // Loads real data from API. No hardcoded statistics.
 
-function SuperAdminDashboard({ session }: { session: NonNullable<Session> }) {
-  const [data, setData] = useState<any>(null);
+function SuperAdminDashboard({
+  session, activeSchool, onSelectCampus
+}: {
+  session: NonNullable<Session>;
+  activeSchool: School;
+  onSelectCampus: (school: School, destination?: string) => void;
+}) {
+  const [data, setData] = useState<GroupOverview | null>(null);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    api.dashboard().then(r => setData(r.data)).catch(() => setData(null)).finally(() => setLoading(false));
+    api.groupOverview()
+      .then(result => setData(result.data))
+      .catch(reason => setError(reason instanceof Error ? reason.message : "Group overview could not be loaded."))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
-    <div className="page">
-      <div className="page-title">
+    <div className="page super-command">
+      <div className="page-title command-title">
         <div>
-          <span className="eyebrow">GLOBAL PLATFORM</span>
-          <h1>Welcome, {session.user.name}.</h1>
-          <p>Group-wide metrics across all campuses.</p>
+          <span className="eyebrow">GROUP CONTROL CENTRE</span>
+          <h1>Every campus.<br />One clear view.</h1>
+          <p>{session.user.name}, you can inspect and operate every active Montessori school.</p>
+        </div>
+        <div className="scope-seal">
+          <Shield size={22} />
+          <div><small>OPERATING NOW</small><strong>{activeSchool.name}</strong><span>{activeSchool.city}</span></div>
         </div>
       </div>
-      {loading ? (
-        <section className="metrics">
-          <Metric label="Loading..." value="..." note="Fetching data" icon={Users} />
-        </section>
+      {error ? <div className="form-error" role="alert">{error}</div> : loading ? (
+        <section className="metrics"><Metric label="Loading..." value="..." note="Fetching group data" icon={Users} /></section>
       ) : data ? (
-        <section className="metrics">
-          <Metric label="Total students" value={data.totals?.students ?? "—"} note="Across all campuses" icon={Users} />
-          <Metric label="Active students" value={data.totals?.active ?? "—"} note="Currently enrolled" icon={UserRound} />
-          <Metric label="Campuses" value={data.totals?.schools ?? "—"} note="All systems online" icon={GraduationCap} />
-          <Metric label="Pending actions" value={data.totals?.pendingCertificates ?? "—"} note="Requires attention" icon={Award} accent />
-        </section>
-      ) : (
-        <section className="metrics">
-          <Metric label="Campuses" value="—" note="All systems online" icon={GraduationCap} />
-        </section>
-      )}
+        <>
+          <section className="metrics">
+            <Metric label="Campuses" value={data.totals.schools} note="Active schools" icon={GraduationCap} />
+            <Metric label="Students" value={data.totals.students} note="Across the group" icon={Users} />
+            <Metric label="Fees collected" value={`₹${data.totals.fees.toLocaleString("en-IN")}`} note="All campuses" icon={WalletCards} />
+            <Metric label="Staff accounts" value={data.totals.staff} note="Active users" icon={UserRound} accent />
+          </section>
+          <AccessResponsibilityPanel role="super" />
+          <CampusPortfolio data={data} activeSchoolId={activeSchool.id} onSelectCampus={onSelectCampus} />
+        </>
+      ) : <div className="empty-state">No active campuses are configured.</div>}
     </div>
   );
 }
 
-function SchoolsPage() {
-  return <ModulePlaceholder name="Campuses Management" />;
+function SchoolsPage({
+  activeSchoolId, onSelectCampus
+}: {
+  activeSchoolId: number;
+  onSelectCampus: (school: School, destination?: string) => void;
+}) {
+  const [data, setData] = useState<GroupOverview | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    api.groupOverview().then(result => setData(result.data))
+      .catch(reason => setError(reason instanceof Error ? reason.message : "Campuses could not be loaded."));
+  }, []);
+  return (
+    <div className="page">
+      <div className="page-title">
+        <div><span className="eyebrow">CAMPUS DIRECTORY</span><h1>Choose where to work.</h1><p>Selection changes the secure school scope for every module.</p></div>
+      </div>
+      {error ? <div className="form-error" role="alert">{error}</div> : data
+        ? <CampusPortfolio data={data} activeSchoolId={activeSchoolId} onSelectCampus={onSelectCampus} />
+        : <section className="metrics"><Metric label="Loading..." value="..." note="Fetching campuses" icon={Building2} /></section>}
+    </div>
+  );
+}
+
+function CampusPortfolio({
+  data, activeSchoolId, onSelectCampus
+}: {
+  data: GroupOverview;
+  activeSchoolId: number;
+  onSelectCampus: (school: School, destination?: string) => void;
+}) {
+  return (
+    <section className="campus-portfolio">
+      <div className="portfolio-heading">
+        <div><span className="step-label">CAMPUS OPERATIONS</span><h2>School-by-school command</h2></div>
+        <span>{data.schools.length} active campuses</span>
+      </div>
+      <div className="campus-ops-grid">
+        {data.schools.map(school => (
+          <article className={`campus-ops-card ${school.id === activeSchoolId ? "selected" : ""}`} key={school.id}>
+            <div className="campus-ops-top">
+              <span className="campus-index">{String(school.id).padStart(2, "0")}</span>
+              {school.id === activeSchoolId && <span className="live-scope">ACTIVE SCOPE</span>}
+            </div>
+            <h3>{school.name}</h3>
+            <p><Building2 size={14} /> {school.city || "Location not configured"}</p>
+            <div className="campus-mini-metrics">
+              <span><strong>{school.students}</strong>Students</span>
+              <span><strong>{school.staff}</strong>Staff</span>
+              <span><strong>{school.events}</strong>Events</span>
+              <span><strong>₹{school.fees.toLocaleString("en-IN")}</strong>Fees</span>
+            </div>
+            <div className="campus-card-actions">
+              <button className="primary-button" onClick={() => onSelectCampus(school, "/students")}>Manage school <ArrowRight size={15} /></button>
+              <button className="secondary-button" onClick={() => onSelectCampus(school, "/dashboard")}>Set scope</button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AccessResponsibilityPanel({ role }: { role: "super" | "school" }) {
+  const isSuper = role === "super";
+  const responsibilities = isSuper
+    ? ["Operate every active campus", "Manage all users and school administrators", "Change academics, fees, events, certificates and settings", "Review group-wide reports and audit activity"]
+    : ["Operate only the assigned campus", "Manage campus staff without granting Group Super Admin", "Maintain students, academics, fees, events and certificates", "Cannot read or change another school's records"];
+  return (
+    <section className={`access-contract ${isSuper ? "group" : "school"}`}>
+      <div className="access-contract-intro">
+        <Shield size={24} />
+        <div><span>{isSuper ? "ALL-SCHOOL AUTHORITY" : "SINGLE-SCHOOL AUTHORITY"}</span><h2>{isSuper ? "Group Super Admin" : "School Admin"}</h2></div>
+      </div>
+      <div className="access-rules">
+        {responsibilities.map(rule => <span key={rule}><CheckCircle2 size={16} /> {rule}</span>)}
+      </div>
+    </section>
+  );
 }
 
 // ─── School Dashboard ────────────────────────────────────────────────────
@@ -607,6 +748,7 @@ function Dashboard({ session }: { session: NonNullable<Session> }) {
               />
             ))}
           </section>
+          {role === "School Admin" && <AccessResponsibilityPanel role="school" />}
 
           <section className="dashboard-grid">
             {role !== "Parent" && (

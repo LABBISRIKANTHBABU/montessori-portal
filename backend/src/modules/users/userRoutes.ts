@@ -28,6 +28,26 @@ async function verifySchoolMembership(schoolId: number, userId: number): Promise
   return Boolean(rows[0]);
 }
 
+async function isProtectedGroupAdministrator(schoolId: number, userId: number): Promise<boolean> {
+  const [rows] = await query(
+    "SELECT 1 FROM v2_user_school_roles WHERE user_id = ? AND school_id = ? AND role_code = 'group_super_admin' LIMIT 1",
+    [userId, schoolId]
+  );
+  return Boolean(rows[0]);
+}
+
+async function mayManageUser(req: AuthRequest, targetUserId: number, res: any): Promise<boolean> {
+  if (!(await verifySchoolMembership(req.auth!.schoolId, targetUserId))) {
+    res.status(404).json({ message: "User not found in this school." });
+    return false;
+  }
+  if (req.auth!.role !== "group_super_admin" && await isProtectedGroupAdministrator(req.auth!.schoolId, targetUserId)) {
+    res.status(403).json({ message: "School administrators cannot manage Group Super Admin accounts." });
+    return false;
+  }
+  return true;
+}
+
 // List users for a school
 router.get("/", requirePermission("user.manage"), async (req: AuthRequest, res, next) => {
   try {
@@ -40,6 +60,14 @@ router.get("/", requirePermission("user.manage"), async (req: AuthRequest, res, 
     );
     res.json({ data: rows.map(r => ({ ...r, roleName: ROLE_NAMES[r.roleCode] || r.roleCode })) });
   } catch (error) { next(error); }
+});
+
+// List roles available to the current administrator.
+router.get("/roles/list", requirePermission("user.manage"), async (req: AuthRequest, res) => {
+  const roles = Object.entries(ROLE_NAMES)
+    .filter(([code]) => req.auth!.role === "group_super_admin" || code !== "group_super_admin")
+    .map(([code, name]) => ({ code, name, permissions: rolePermissions[code] || [] }));
+  res.json({ data: roles });
 });
 
 // Get single user
@@ -64,6 +92,10 @@ router.post("/", requirePermission("user.manage"), async (req: AuthRequest, res,
     password: z.string(), roleCode: z.string().min(1)
   }).safeParse(req.body);
   if (!parsed.success) return res.status(422).json({ message: "Provide name, email, password, and role." });
+  if (parsed.data.roleCode === "group_super_admin" && req.auth!.role !== "group_super_admin") {
+    return res.status(403).json({ message: "Only a Group Super Admin can create another Group Super Admin." });
+  }
+  if (!rolePermissions[parsed.data.roleCode]) return res.status(422).json({ message: "Select a valid role." });
   try {
     // Check duplicate email
     const [existing] = await query(
@@ -89,7 +121,7 @@ router.post("/", requirePermission("user.manage"), async (req: AuthRequest, res,
       [req.auth!.schoolId, req.auth!.userId, userId]
     );
 
-    res.status(201).json({ data: { id: userId, message: "User created. They must change password on first login." } });
+    res.status(201).json({ data: { id: userId, message: "User created successfully." } });
   } catch (error) { next(error); }
 });
 
@@ -97,11 +129,13 @@ router.post("/", requirePermission("user.manage"), async (req: AuthRequest, res,
 router.put("/:id", requirePermission("user.manage"), async (req: AuthRequest, res, next) => {
   const parsed = z.object({ name: z.string().min(2).max(150), roleCode: z.string().min(1) }).safeParse(req.body);
   if (!parsed.success) return res.status(422).json({ message: "Provide name and role." });
+  if (parsed.data.roleCode === "group_super_admin" && req.auth!.role !== "group_super_admin") {
+    return res.status(403).json({ message: "Only a Group Super Admin can grant the Group Super Admin role." });
+  }
+  if (!rolePermissions[parsed.data.roleCode]) return res.status(422).json({ message: "Select a valid role." });
   try {
     const targetUserId = Number(req.params.id);
-    // Verify target user belongs to this school
-    const isMember = await verifySchoolMembership(req.auth!.schoolId, targetUserId);
-    if (!isMember) return res.status(404).json({ message: "User not found in this school." });
+    if (!(await mayManageUser(req, targetUserId, res))) return;
 
     await query("UPDATE v2_users SET name = ? WHERE id = ?", [parsed.data.name, targetUserId]);
     await query("UPDATE v2_user_school_roles SET role_code = ? WHERE user_id = ? AND school_id = ?",
@@ -114,8 +148,7 @@ router.put("/:id", requirePermission("user.manage"), async (req: AuthRequest, re
 router.patch("/:id/deactivate", requirePermission("user.manage"), async (req: AuthRequest, res, next) => {
   try {
     const targetUserId = Number(req.params.id);
-    const isMember = await verifySchoolMembership(req.auth!.schoolId, targetUserId);
-    if (!isMember) return res.status(404).json({ message: "User not found in this school." });
+    if (!(await mayManageUser(req, targetUserId, res))) return;
 
     await query("UPDATE v2_users SET is_active = 0 WHERE id = ?", [targetUserId]);
     await query(
@@ -131,8 +164,7 @@ router.patch("/:id/deactivate", requirePermission("user.manage"), async (req: Au
 router.patch("/:id/activate", requirePermission("user.manage"), async (req: AuthRequest, res, next) => {
   try {
     const targetUserId = Number(req.params.id);
-    const isMember = await verifySchoolMembership(req.auth!.schoolId, targetUserId);
-    if (!isMember) return res.status(404).json({ message: "User not found in this school." });
+    if (!(await mayManageUser(req, targetUserId, res))) return;
 
     await query("UPDATE v2_users SET is_active = 1 WHERE id = ?", [targetUserId]);
     await query(
@@ -150,8 +182,7 @@ router.post("/:id/reset-password", requirePermission("user.manage"), async (req:
   if (!parsed.success) return res.status(422).json({ message: "Provide a new password." });
   try {
     const targetUserId = Number(req.params.id);
-    const isMember = await verifySchoolMembership(req.auth!.schoolId, targetUserId);
-    if (!isMember) return res.status(404).json({ message: "User not found in this school." });
+    if (!(await mayManageUser(req, targetUserId, res))) return;
 
     const hash = await bcrypt.hash(parsed.data.newPassword, 12);
     await query("UPDATE v2_users SET password_hash = ?, force_password_reset = 0 WHERE id = ?", [hash, targetUserId]);
@@ -171,8 +202,7 @@ router.delete("/:id", requirePermission("user.manage"), async (req: AuthRequest,
     if (targetUserId === req.auth!.userId) {
       return res.status(400).json({ message: "You cannot delete your own account." });
     }
-    const isMember = await verifySchoolMembership(req.auth!.schoolId, targetUserId);
-    if (!isMember) return res.status(404).json({ message: "User not found in this school." });
+    if (!(await mayManageUser(req, targetUserId, res))) return;
 
     await query("UPDATE v2_users SET is_active = 0 WHERE id = ?", [targetUserId]);
     await query(
@@ -186,14 +216,6 @@ router.delete("/:id", requirePermission("user.manage"), async (req: AuthRequest,
     );
     res.json({ data: { message: "User deleted." } });
   } catch (error) { next(error); }
-});
-
-// List roles
-router.get("/roles/list", requirePermission("user.manage"), async (_req, res) => {
-  const roles = Object.entries(ROLE_NAMES).map(([code, name]) => ({
-    code, name, permissions: rolePermissions[code] || []
-  }));
-  res.json({ data: roles });
 });
 
 export default router;

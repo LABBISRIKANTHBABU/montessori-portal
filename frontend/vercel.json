@@ -1,8 +1,5 @@
 {
-  "buildCommand": "npm run build -w frontend",
-  "outputDirectory": "frontend/dist",
-  "installCommand": "npm install",
-  "framework": null,
+  "framework": "vite",
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],

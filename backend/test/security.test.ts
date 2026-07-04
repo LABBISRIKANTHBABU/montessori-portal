@@ -37,3 +37,11 @@ test("all operational roles can load the dashboard", async () => {
     assert.ok(rolePermissions[role]?.includes("dashboard.view"), `${role} must be able to view the dashboard`);
   }
 });
+
+test("group super admin contains every school admin permission", async () => {
+  const { rolePermissions } = await import("../src/security/permissions.js");
+  for (const permission of rolePermissions.school_admin) {
+    assert.ok(rolePermissions.group_super_admin.includes(permission), `missing super-admin permission: ${permission}`);
+  }
+  assert.ok(rolePermissions.group_super_admin.includes("student.identifier.view_sensitive"));
+});

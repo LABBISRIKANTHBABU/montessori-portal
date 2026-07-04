@@ -20,6 +20,17 @@ export const token = {
   clear: () => localStorage.removeItem(TOKEN_KEY)
 };
 
+const SCHOOL_SCOPE_KEY = "monte_school_scope";
+export const schoolScope = {
+  get: () => localStorage.getItem(SCHOOL_SCOPE_KEY),
+  set: (schoolId: number) => localStorage.setItem(SCHOOL_SCOPE_KEY, String(schoolId)),
+  clear: () => localStorage.removeItem(SCHOOL_SCOPE_KEY),
+};
+const scopedAuthHeaders = () => ({
+  Authorization: `Bearer ${token.get()}`,
+  ...(schoolScope.get() ? { "X-School-ID": schoolScope.get()! } : {}),
+});
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const isForm = options.body instanceof FormData;
   const response = await fetch(apiPath(path), {
@@ -28,6 +39,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers: {
       ...(!isForm ? { "Content-Type": "application/json" } : {}),
       ...(token.get() ? { Authorization: `Bearer ${token.get()}` } : {}),
+      ...(schoolScope.get() ? { "X-School-ID": schoolScope.get()! } : {}),
       ...options.headers
     }
   });
@@ -56,6 +68,8 @@ export const api = {
       body: JSON.stringify(payload)
     }),
   dashboard: () => request<{ data: DashboardData }>("/dashboard"),
+  groupOverview: () => request<{ data: GroupOverview }>("/admin/overview"),
+  accessModel: () => request<{ data: { role: string; scope: "all_schools" | "assigned_school"; homeSchoolId: number; activeSchoolId: number; permissions: string[] } }>("/access-model"),
   logout: () => request<{message:string}>("/auth/logout",{method:"POST"}),
   students: (query = "", status = "", page = 1) => request<{ data: Student[]; total: number; page: number; limit: number }>(`/students?search=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}&page=${page}`),
   academicSetup: () => request<{ data: { academicYears: string[]; boards: string[]; classes: string[] } }>("/academic/setup"),
@@ -85,7 +99,7 @@ export const api = {
   approveImport:(id:string)=>request<{data:any}>(`/imports/${id}/approve`,{method:"POST"}),
   rejectImport:(id:string)=>request<{data:any}>(`/imports/${id}/reject`,{method:"POST"}),
   rollbackImport:(id:string)=>request<{data:any}>(`/imports/${id}/rollback`,{method:"POST"}),
-  downloadImportErrors:async(id:string)=>{const response=await fetch(apiPath(`/imports/${id}/errors.csv`),{credentials:"include",headers:{Authorization:`Bearer ${token.get()}`}});if(!response.ok)throw new Error("Could not download error report.");return response.blob();},
+  downloadImportErrors:async(id:string)=>{const response=await fetch(apiPath(`/imports/${id}/errors.csv`),{credentials:"include",headers:scopedAuthHeaders()});if(!response.ok)throw new Error("Could not download error report.");return response.blob();},
   viewErrorReport:(id:string)=>apiPath(`/imports/${id}/errors.html`),
 
   // Documents
@@ -94,7 +108,7 @@ export const api = {
   searchDocuments: (q: string, category = "") => request<{ data: any[] }>(`/documents/search?q=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}`),
   uploadDocument: (studentId: number, payload: FormData) => request<{ data: any }>(`/documents/students/${studentId}/documents`, { method: "POST", body: payload }),
   previewDocument: (docId: number) => apiPath(`/documents/${docId}/preview`),
-  downloadDocument: async (docId: number) => { const r = await fetch(apiPath(`/documents/${docId}/download`), { credentials: "include", headers: { Authorization: `Bearer ${token.get()}` } }); if (!r.ok) throw new Error("Download failed."); return r.blob(); },
+  downloadDocument: async (docId: number) => { const r = await fetch(apiPath(`/documents/${docId}/download`), { credentials: "include", headers: scopedAuthHeaders() }); if (!r.ok) throw new Error("Download failed."); return r.blob(); },
   replaceDocument: (docId: number, payload: FormData) => request<{ data: any }>(`/documents/${docId}/replace`, { method: "PUT", body: payload }),
   archiveDocument: (docId: number) => request<{ data: any }>(`/documents/${docId}/archive`, { method: "PATCH" }),
   restoreDocument: (docId: number) => request<{ data: any }>(`/documents/${docId}/restore`, { method: "PATCH" }),
@@ -107,7 +121,7 @@ export const api = {
   generateCertificate: (studentId: number, payload: { certificateType: string; academicYear?: string; reason?: string }) => request<{ data: any }>(`/certificates/students/${studentId}/certificates`, { method: "POST", body: JSON.stringify(payload) }),
   listCertificates: (type = "", status = "") => request<{ data: any[] }>(`/certificates?type=${type}&status=${status}`),
   previewCertificate: (id: number) => apiPath(`/certificates/${id}/preview`),
-  downloadCertificate: async (id: number) => { const r = await fetch(apiPath(`/certificates/${id}/download`), { credentials: "include", headers: { Authorization: `Bearer ${token.get()}` } }); if (!r.ok) throw new Error("Download failed."); return r.blob(); },
+  downloadCertificate: async (id: number) => { const r = await fetch(apiPath(`/certificates/${id}/download`), { credentials: "include", headers: scopedAuthHeaders() }); if (!r.ok) throw new Error("Download failed."); return r.blob(); },
   certificateHistory: (id: number) => request<{ data: any[] }>(`/certificates/${id}/history`),
   revokeCertificate: (id: number) => request<{ data: any }>(`/certificates/${id}/revoke`, { method: "PATCH" }),
 
@@ -274,3 +288,10 @@ export type DashboardData = {
 
 export type SearchResult = { type: string; id: number; title: string; subtitle: string; module: string };
 export type Notification = { id: number; title: string; message: string; type: string; read: boolean; createdAt: string; module: string; entityId: number | null };
+export type GroupSchoolMetrics = School & {
+  students: number; activeStudents: number; events: number; fees: number; certificates: number; staff: number;
+};
+export type GroupOverview = {
+  totals: { schools: number; students: number; activeStudents: number; events: number; fees: number; certificates: number; staff: number };
+  schools: GroupSchoolMetrics[];
+};
