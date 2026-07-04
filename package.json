@@ -7,6 +7,7 @@
     "backend"
   ],
   "scripts": {
+    "postinstall": "node -e \"if(!process.env.VERCEL) { require('child_process').execSync('npm run build -w backend', {stdio:'inherit'}) }\"",
     "dev": "concurrently -n API,WEB -c green,cyan \"npm run dev -w backend\" \"npm run dev -w frontend\"",
     "build": "npm install -w backend && npm install -w frontend && npm run build -w backend && npm run build -w frontend",
     "test": "npm run test -w backend && npm run test -w frontend",
