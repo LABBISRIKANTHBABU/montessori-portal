@@ -114,7 +114,7 @@ function AccountsDashboard() {
 
 const DashCard = memo(function DashCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
   return (
-    <div style={{ padding: 16, background: "var(--cream)", borderRadius: 8, display: "flex", alignItems: "flex-start", gap: 12 }}>
+    <div className="erp-stat-card" style={{ padding: 16, background: "var(--cream)", borderRadius: 8, display: "flex", alignItems: "flex-start", gap: 12 }}>
       <div style={{ color, marginTop: 2 }}>{icon}</div>
       <div>
         <small style={{ color: "var(--muted)", fontSize: 11, fontWeight: 700 }}>{label}</small>
@@ -196,7 +196,7 @@ function FeeCollectionTab() {
         <div style={{ margin: "12px 0", padding: 12, background: "#ecfdf5", borderRadius: 8, border: "1px solid #86efac", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ color: "var(--forest)", fontWeight: 600 }}>Receipt: <strong>{receipt.number}</strong></span>
           <div style={{ display: "flex", gap: 8 }}>
-            <a href={api.receiptPreview(receipt.id)} target="_blank" rel="noreferrer" className="icon-button" title="Preview receipt"><Eye size={14} /></a>
+            <button onClick={() => void api.receiptPreview(receipt.id)} className="icon-button" title="Preview receipt"><Eye size={14} /></button>
             <button className="icon-button" onClick={() => setReceipt(null)}><X size={14} /></button>
           </div>
         </div>
@@ -259,7 +259,7 @@ function FeeCollectionTab() {
       <div style={{ marginTop: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span className="step-label">PAYMENT HISTORY</span>
-          {selectedStudent && <button className="secondary-button" onClick={() => window.open(api.receiptPreview(payments[0]?.id || 0), "_blank")} disabled={!payments.length}><Download size={14} /> Latest Receipt</button>}
+          {selectedStudent && <button className="secondary-button" onClick={() => void api.receiptPreview(payments[0]?.id || 0)} disabled={!payments.length}><Download size={14} /> Latest Receipt</button>}
         </div>
         <div className="table-scroll" style={{ marginTop: 12 }}>
           <table>
@@ -281,7 +281,7 @@ function FeeCollectionTab() {
                     <td><span className="status-badge">{p.paymentMode || "—"}</span></td>
                     <td><strong>{p.receiptNumber || "—"}</strong></td>
                     <td>{p.recordedByName || "—"}</td>
-                    <td><a href={api.receiptPreview(p.id)} target="_blank" rel="noreferrer" className="icon-button" title="View receipt"><Eye size={14} /></a></td>
+                    <td><button onClick={() => void api.receiptPreview(p.id)} className="icon-button" title="View receipt"><Eye size={14} /></button></td>
                   </tr>
                 ))
               )}
@@ -352,7 +352,7 @@ function CashBookTab() {
         <span className="step-label">DAILY CASH BOOK</span>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ padding: "6px 10px", border: "1px solid var(--line)", borderRadius: 6 }} />
-          <a href={api.cashbookExport(date)} className="secondary-button" style={{ textDecoration: "none" }}><Download size={14} /> Export</a>
+          <button onClick={() => void api.cashbookExport(date)} className="secondary-button"><Download size={14} /> Export</button>
           <button className="primary-button" onClick={() => setShowForm(!showForm)}><Plus size={16} /> Add entry</button>
         </div>
       </div>
@@ -586,7 +586,7 @@ function SuppliersTab() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span className="step-label">SUPPLIER LEDGER</span>
             <div style={{ display: "flex", gap: 8 }}>
-              <a href={api.supplierExport(selected)} className="secondary-button" style={{ textDecoration: "none" }}><Download size={14} /> Export</a>
+              <button onClick={() => void api.supplierExport(selected)} className="secondary-button"><Download size={14} /> Export</button>
               <button className="primary-button" onClick={() => setShowTxForm(!showTxForm)}><Plus size={16} /> Add transaction</button>
             </div>
           </div>
@@ -671,7 +671,7 @@ function VouchersTab() {
             <option value="journal">Journal (JV)</option>
             <option value="expense">Expense (EV)</option>
           </select>
-          <a href={api.voucherExport(typeFilter)} className="secondary-button" style={{ textDecoration: "none" }}><Download size={14} /> Export</a>
+          <button onClick={() => void api.voucherExport(typeFilter)} className="secondary-button"><Download size={14} /> Export</button>
           <button className="primary-button" onClick={() => setShowForm(!showForm)}><Plus size={16} /> Create voucher</button>
         </div>
       </div>
@@ -712,7 +712,7 @@ function VouchersTab() {
                   <td>{v.paymentMode || "—"}</td>
                   <td>{v.date ? new Date(v.date).toLocaleDateString() : "—"}</td>
                   <td><span className={`status-badge ${v.status === "approved" ? "" : "withdrawn"}`}>{v.status}</span></td>
-                  <td><a href={api.voucherPreview(v.id)} target="_blank" rel="noreferrer" className="icon-button" title="Preview voucher"><Eye size={14} /></a></td>
+                  <td><button onClick={() => void api.voucherPreview(v.id)} className="icon-button" title="Preview voucher"><Eye size={14} /></button></td>
                 </tr>
               ))
             )}
@@ -1032,7 +1032,7 @@ function ReportsTab() {
             <span className="step-label">FEE DEFAULTERS</span>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input value={defaultersYear} onChange={e => setDefaultersYear(e.target.value)} placeholder="Academic year" style={{ padding: "6px 10px", border: "1px solid var(--line)", borderRadius: 6, width: 150 }} />
-              <a href={api.feeDefaultersExport(defaultersYear)} className="secondary-button" style={{ textDecoration: "none" }}><Download size={14} /> Export</a>
+              <button onClick={() => void api.feeDefaultersExport(defaultersYear)} className="secondary-button"><Download size={14} /> Export</button>
             </div>
           </div>
           <div className="table-scroll">

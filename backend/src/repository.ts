@@ -6,9 +6,9 @@
  */
 
 import bcrypt from "bcryptjs";
-import { getPool, query } from "./database/pool.js";
+import { getPool, query, withTransaction } from "./database/pool.js";
 import { createAccessToken } from "./security/accessToken.js";
-import { createProductionStudent, getProductionAcademicSetup, getProductionDashboard, getProductionStudent, listProductionStudents, updateProductionStudent, changeProductionStudentStatus, restoreProductionStudent, exportProductionStudents, checkDuplicateAdmission, bulkPromoteProductionStudents, bulkAssignProductionStudents, getProductionStudentTimeline, getProductionStudentMedical, upsertProductionStudentMedical, getProductionStudentNotes, createProductionStudentNote, deleteProductionStudentNote } from "./modules/students/studentRepository.js";
+import { createProductionStudent, getProductionAcademicSetup, getProductionDashboard, getProductionStudent, listProductionStudents, updateProductionStudent, changeProductionStudentStatus, restoreProductionStudent, exportProductionStudents, checkDuplicateAdmission, bulkPromoteProductionStudents, bulkAssignProductionStudents, graduateGradeTenStudents, getProductionStudentTimeline, getProductionStudentMedical, upsertProductionStudentMedical, getProductionStudentNotes, createProductionStudentNote, deleteProductionStudentNote } from "./modules/students/studentRepository.js";
 import { listBatches, getBatch, stageBatch, approveBatch, existingAdmissionNumbers } from "./modules/imports/importService.js";
 import type { RowDataPacket } from "mysql2/promise";
 
@@ -65,7 +65,7 @@ export async function getSchoolById(schoolId: number): Promise<School | null> {
 
 export async function authenticateUser(schoolId: number, email: string, password: string, ipAddress?: string, userAgent?: string): Promise<{
   token: string;
-  user: { name: string; role: string }; school: School;
+  user: { name: string; role: string; roleCode: string; permissions: string[] }; school: School;
 } | null> {
   // Super admin login (schoolId = 0): don't filter by school
   const isSuperAdminLogin = schoolId === 0;
@@ -108,7 +108,7 @@ export async function authenticateUser(schoolId: number, email: string, password
 
   return {
     token: jwt,
-    user: { name: account.userName, role: roleDisplay },
+    user: { name: account.userName, role: roleDisplay, roleCode: account.roleCode, permissions },
     school: { id: account.schoolId, code: account.code, name: account.schoolName, city: account.city },
   };
 }
@@ -193,6 +193,10 @@ export async function bulkPromoteStudents(schoolId: number, studentIds: number[]
 
 export async function bulkAssignStudents(schoolId: number, studentIds: number[], assignType: "class" | "section", value: string, userId: number) {
   return bulkAssignProductionStudents(schoolId, studentIds, assignType, value, userId);
+}
+
+export async function bulkGraduateGradeTen(schoolId: number, studentIds: number[], userId: number) {
+  return graduateGradeTenStudents(schoolId, studentIds, userId);
 }
 
 export async function getStudentTimeline(schoolId: number, studentId: number) {
@@ -431,13 +435,27 @@ export async function addCashbookEntry(schoolId: number, userId: number, data: {
   entryType: string; category: string; description: string; amount: number;
   paymentMode: string; referenceNumber?: string; entryDate: string;
 }) {
-  const [result] = await getPool().execute<RowDataPacket[]>(
-    `INSERT INTO v2_daily_cashbook (school_id, entry_date, entry_type, category, description, amount, payment_mode, reference_number, recorded_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [schoolId, data.entryDate, data.entryType, data.category, data.description,
-     data.amount, data.paymentMode, data.referenceNumber || null, userId]
-  );
-  return (result as any).insertId;
+  return withTransaction(async connection => {
+    const [cashbookResult] = await connection.execute(
+      `INSERT INTO v2_daily_cashbook (school_id, entry_date, entry_type, category, description, amount, payment_mode, reference_number, recorded_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [schoolId, data.entryDate, data.entryType, data.category, data.description,
+       data.amount, data.paymentMode, data.referenceNumber || null, userId],
+    );
+    const cashbookId = Number((cashbookResult as any).insertId);
+    const voucherType = data.entryType === "expense" ? "expense" : "receipt";
+    const prefix = voucherType === "expense" ? "EV" : "RV";
+    const voucherNumber = `${prefix}-${data.entryDate.slice(0, 4)}-${String(cashbookId).padStart(6, "0")}`;
+    const [voucherResult] = await connection.execute(
+      `INSERT INTO v2_vouchers
+       (school_id, voucher_type, voucher_number, voucher_date, payee_name, amount, description,
+        payment_mode, status, created_by, approved_by, source_cashbook_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?)`,
+      [schoolId, voucherType, voucherNumber, data.entryDate, data.category, data.amount,
+       data.description, data.paymentMode, userId, userId, cashbookId],
+    );
+    return { id: cashbookId, voucherId: Number((voucherResult as any).insertId), voucherNumber };
+  });
 }
 
 export async function getAccountsDashboard(schoolId: number) {

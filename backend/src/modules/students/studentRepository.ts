@@ -12,7 +12,7 @@ export type ProductionStudentInput = {
   fatherQualification?: string; fatherOccupation?: string; motherName?: string; motherAadhaarNo?: string;
   motherMobileNumber?: string; motherEmail?: string; motherQualification?: string; motherOccupation?: string;
   motherBankAccountNo?: string; bankIfscCode?: string; studentEmail?: string; residenceAddress: string;
-  currentStatus?: "active" | "alumni" | "withdrawn" | "transferred" | "inactive";
+  currentStatus?: "active" | "inactive" | "dropped" | "transferred" | "alumni";
   classLeaving?: string; dateOfLeaving?: string; leavingTcNo?: string; tcTakenDate?: string;
 };
 
@@ -120,7 +120,13 @@ export async function listProductionStudents(schoolId: number, search: string, s
   const [rows] = await getPool().execute<RowDataPacket[]>(
     `SELECT s.id, s.student_uid studentUid, s.admission_no admissionNo, s.full_name fullName,
             COALESCE(a.class_admitted, '—') className, COALESCE(a.section_name, '—') sectionName,
-            COALESCE(s.gender, 'other') gender, s.current_status status
+            COALESCE(s.gender, 'other') gender, s.current_status status,
+            (SELECT g.mobile
+             FROM v2_student_guardians sg
+             JOIN v2_guardians g ON g.id = sg.guardian_id
+             WHERE sg.student_id = s.id
+             ORDER BY sg.is_primary DESC, sg.id
+             LIMIT 1) guardianPhone
      FROM v2_students s
      LEFT JOIN v2_admissions a ON a.student_id = s.id
      WHERE ${where}
@@ -294,6 +300,42 @@ export async function bulkAssignProductionStudents(schoolId: number, studentIds:
       );
     }
     return { assigned: ids.length, studentIds: ids };
+  });
+}
+
+export async function graduateGradeTenStudents(schoolId: number, studentIds: number[], userId: number) {
+  return withTransaction(async connection => {
+    const [rows] = await connection.execute<RowDataPacket[]>(
+      `SELECT s.id, s.current_status currentStatus, a.class_admitted className
+       FROM v2_students s
+       JOIN v2_admissions a ON a.student_id = s.id
+       WHERE s.school_id = ? AND s.id IN (${studentIds.map(() => "?").join(",")})
+         AND s.deleted_at IS NULL FOR UPDATE`,
+      [schoolId, ...studentIds],
+    );
+    const terminalClasses = new Set(["10", "grade 10", "class 10", "x"]);
+    const eligible = rows.filter((row: any) =>
+      row.currentStatus === "active" && terminalClasses.has(String(row.className || "").trim().toLowerCase()),
+    );
+    for (const row of eligible as any[]) {
+      await connection.execute("UPDATE v2_students SET current_status = 'alumni' WHERE id = ?", [row.id]);
+      await connection.execute(
+        `INSERT INTO v2_student_status_history (student_id, old_status, new_status, reason, changed_by)
+         VALUES (?, ?, 'alumni', 'Grade 10 completion', ?)`,
+        [row.id, row.currentStatus, userId],
+      );
+      await connection.execute(
+        `INSERT INTO v2_audit_events
+         (school_id, user_id, entity_type, entity_id, action_name, metadata_json)
+         VALUES (?, ?, 'student', ?, 'student.graduate', JSON_OBJECT('fromClass', ?, 'status', 'alumni'))`,
+        [schoolId, userId, row.id, row.className],
+      );
+    }
+    return {
+      graduated: eligible.length,
+      studentIds: eligible.map((row: any) => Number(row.id)),
+      skipped: rows.length - eligible.length,
+    };
   });
 }
 

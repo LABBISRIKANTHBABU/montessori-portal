@@ -106,18 +106,18 @@ export default function StudentProfilePage({ id }: { id: number }) {
     window.print();
   }
 
-  const isInactive = student.status === "withdrawn" || student.status === "suspended" || student.status === "inactive" || student.status === "deleted";
+  const isInactive = ["inactive", "dropped", "transferred", "alumni"].includes(student.status);
 
   const tabs = [
-    { id: "general", label: "General", icon: UserRound },
+    { id: "general", label: "Overview", icon: UserRound },
     { id: "parents", label: "Parents", icon: UserRound },
-    { id: "academic", label: "Academic", icon: GraduationCap },
+    { id: "academic", label: "Academics", icon: GraduationCap },
     { id: "documents", label: "Documents", icon: FolderOpen },
     { id: "certificates", label: "Certificates", icon: FolderOpen },
-    { id: "fees", label: "Fees", icon: WalletCards },
+    { id: "fees", label: "Fee History", icon: WalletCards },
     { id: "medical", label: "Medical", icon: Heart },
     { id: "notes", label: "Notes", icon: StickyNote },
-    { id: "timeline", label: "Activity", icon: History }
+    { id: "timeline", label: "Timeline", icon: History }
   ];
 
   return (
@@ -159,10 +159,10 @@ export default function StudentProfilePage({ id }: { id: number }) {
             >
               <option value="" disabled>Change Status...</option>
               <option value="active">Set Active</option>
+              <option value="inactive">Mark Inactive</option>
+              <option value="dropped">Mark Dropped</option>
+              <option value="transferred">Mark Transferred</option>
               <option value="alumni">Mark Alumni</option>
-              <option value="withdrawn">Mark Withdrawn</option>
-              <option value="suspended">Mark Suspended</option>
-              <option value="deleted">Soft Delete</option>
             </select>
           </div>
         </div>

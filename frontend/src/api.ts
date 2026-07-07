@@ -8,6 +8,7 @@ export type Student = {
   sectionName: string;
   gender: string;
   status: string;
+  guardianPhone?: string;
 };
 
 const TOKEN_KEY = "monte_token";
@@ -16,6 +17,14 @@ export const apiConfigurationError = import.meta.env.PROD && !API_BASE
   ? "Production API is not configured. Set VITE_API_URL in Vercel and redeploy."
   : "";
 export const apiPath = (path: string) => `${API_BASE}/api${path}`;
+
+function explainNetworkFailure(error: unknown) {
+  if (error instanceof TypeError && /fetch/i.test(error.message)) {
+    const target = API_BASE || window.location.origin;
+    return new Error(`Backend is not reachable at ${target}. Verify Hostinger is routing the API domain to the Node.js app, /api/health returns JSON, and CORS allows this frontend domain.`);
+  }
+  return error;
+}
 
 export const token = {
   get: () => localStorage.getItem(TOKEN_KEY),
@@ -38,15 +47,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (apiConfigurationError) throw new Error(apiConfigurationError);
   const isForm = options.body instanceof FormData;
   const response = await fetch(apiPath(path), {
-    ...options,
-    credentials: "include",
-    headers: {
-      ...(!isForm ? { "Content-Type": "application/json" } : {}),
-      ...(token.get() ? { Authorization: `Bearer ${token.get()}` } : {}),
-      ...(schoolScope.get() ? { "X-School-ID": schoolScope.get()! } : {}),
-      ...options.headers
-    }
-  });
+      ...options,
+      credentials: "include",
+      headers: {
+        ...(!isForm ? { "Content-Type": "application/json" } : {}),
+        ...(token.get() ? { Authorization: `Bearer ${token.get()}` } : {}),
+        ...(schoolScope.get() ? { "X-School-ID": schoolScope.get()! } : {}),
+        ...options.headers
+      }
+    })
+    .catch(error => { throw explainNetworkFailure(error); });
   const body = await response.json().catch(() => ({}));
   if (response.status === 401 && !path.startsWith("/auth/")) {
     token.clear();
@@ -60,10 +70,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 async function requestBlob(path: string, options: RequestInit = {}): Promise<Blob> {
   if (apiConfigurationError) throw new Error(apiConfigurationError);
   const response = await fetch(apiPath(path), {
-    ...options,
-    credentials: "include",
-    headers: { ...scopedAuthHeaders(), ...options.headers },
-  });
+      ...options,
+      credentials: "include",
+      headers: { ...scopedAuthHeaders(), ...options.headers },
+    })
+    .catch(error => { throw explainNetworkFailure(error); });
   if (response.status === 401) {
     token.clear();
     schoolScope.clear();
@@ -77,6 +88,25 @@ async function requestBlob(path: string, options: RequestInit = {}): Promise<Blo
   return response.blob();
 }
 
+async function openAuthenticatedFile(path: string) {
+  const blob = await requestBlob(path);
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener,noreferrer");
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+async function downloadAuthenticatedFile(path: string, filename: string) {
+  const blob = await requestBlob(path);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 function buildDateQuery(from: string, to: string): string {
   const params: string[] = [];
   if (from) params.push(`from=${from}`);
@@ -85,12 +115,17 @@ function buildDateQuery(from: string, to: string): string {
 }
 
 export const api = {
+  health: () => request<{ status: string; checks?: { app?: boolean; database?: boolean }; database?: { ok?: boolean; latencyMs?: number }; message?: string }>("/health"),
   schools: () => request<{ data: School[] }>("/schools"),
   login: (payload: { schoolId: number; email: string; password: string }) =>
-    request<{ token: string; user: { name: string; role: string }; school: School }>("/auth/login", {
+    request<{ token: string; user: { name: string; role: string; roleCode: string; permissions: string[] }; school: School }>("/auth/login", {
       method: "POST",
       body: JSON.stringify(payload)
     }),
+  forgotPassword: (payload: { schoolId: number; email: string }) =>
+    request<{ message: string }>("/auth/forgot-password", { method: "POST", body: JSON.stringify(payload) }),
+  resetOwnPassword: (payload: { schoolId: number; token: string; newPassword: string }) =>
+    request<{ message: string }>("/auth/reset-password", { method: "POST", body: JSON.stringify(payload) }),
   dashboard: () => request<{ data: DashboardData }>("/dashboard"),
   groupOverview: () => request<{ data: GroupOverview }>("/admin/overview"),
   accessModel: () => request<{ data: { role: string; scope: "all_schools" | "assigned_school"; homeSchoolId: number; activeSchoolId: number; permissions: string[] } }>("/access-model"),
@@ -109,6 +144,8 @@ export const api = {
     request<{data:any}>("/students/bulk/promote",{method:"POST",body:JSON.stringify({studentIds,targetClass,targetSection})}),
   bulkAssign: (studentIds: number[], assignType: "class" | "section", value: string) =>
     request<{data:any}>("/students/bulk/assign",{method:"POST",body:JSON.stringify({studentIds,assignType,value})}),
+  bulkGraduateGradeTen: (studentIds: number[]) =>
+    request<{data:{graduated:number;studentIds:number[];skipped:number}}>("/students/bulk/graduate-grade-10",{method:"POST",body:JSON.stringify({studentIds})}),
   studentTimeline: (id: number) => request<{data:any[]}>(`/students/${id}/timeline`),
   studentMedical: (id: number) => request<{data:any}>(`/students/${id}/medical`),
   updateStudentMedical: (id: number, payload: any) => request<{data:any}>(`/students/${id}/medical`,{method:"PUT",body:JSON.stringify(payload)}),
@@ -159,30 +196,30 @@ export const api = {
   feePayments: (studentId = 0, year = "") => request<{ data: any[] }>(`/accounts/fee-payments?studentId=${studentId}&year=${year}`),
   collectFee: (payload: any) => request<{ data: any }>("/accounts/fee-payments", { method: "POST", body: JSON.stringify(payload) }),
   studentFees: (studentId: number, year = "") => request<{ data: any }>(`/accounts/students/${studentId}/fees?year=${year}`),
-  receiptPreview: (id: number) => apiPath(`/accounts/fee-payments/${id}/receipt/preview`),
-  receiptPdf: (id: number) => apiPath(`/accounts/fees/receipt/${id}/pdf`),
+  receiptPreview: (id: number) => openAuthenticatedFile(`/accounts/fee-payments/${id}/receipt/preview`),
+  receiptPdf: (id: number) => downloadAuthenticatedFile(`/accounts/fees/receipt/${id}/pdf`, `receipt-${id}.pdf`),
   cashbook: (date = "") => request<{ data: any[] }>(`/accounts/cashbook?date=${date}`),
   addCashbookEntry: (payload: any) => request<{ data: any }>("/accounts/cashbook", { method: "POST", body: JSON.stringify(payload) }),
-  cashbookExport: (date = "") => apiPath(`/accounts/reports/cashbook/export?date=${date}`),
+  cashbookExport: (date = "") => downloadAuthenticatedFile(`/accounts/reports/cashbook/export?date=${date}`, `cashbook-${date || "all"}.csv`),
   bankBook: (month = "") => request<{ data: any[] }>(`/accounts/bank-book?month=${month}`),
   suppliers: () => request<{ data: any[] }>("/accounts/suppliers"),
   createSupplier: (payload: any) => request<{ data: any }>("/accounts/suppliers", { method: "POST", body: JSON.stringify(payload) }),
   supplierTransactions: (id: number) => request<{ data: any[] }>(`/accounts/suppliers/${id}/transactions`),
   addSupplierTransaction: (id: number, payload: any) => request<{ data: any }>(`/accounts/suppliers/${id}/transactions`, { method: "POST", body: JSON.stringify(payload) }),
   supplierOutstanding: () => request<{ data: any[] }>("/accounts/suppliers/outstanding"),
-  supplierExport: (id: number) => apiPath(`/accounts/suppliers/${id}/export`),
+  supplierExport: (id: number) => downloadAuthenticatedFile(`/accounts/suppliers/${id}/export`, `supplier-${id}.csv`),
   vouchers: (type = "") => request<{ data: any[] }>(`/accounts/vouchers?type=${type}`),
   createVoucher: (payload: any) => request<{ data: any }>("/accounts/vouchers", { method: "POST", body: JSON.stringify(payload) }),
-  voucherPreview: (id: number) => apiPath(`/accounts/vouchers/${id}/preview`),
-  voucherPdf: (id: number) => apiPath(`/accounts/vouchers/${id}/pdf`),
-  voucherExport: (type = "") => apiPath(`/accounts/vouchers/export?type=${type}`),
+  voucherPreview: (id: number) => openAuthenticatedFile(`/accounts/vouchers/${id}/preview`),
+  voucherPdf: (id: number) => downloadAuthenticatedFile(`/accounts/vouchers/${id}/pdf`, `voucher-${id}.pdf`),
+  voucherExport: (type = "") => downloadAuthenticatedFile(`/accounts/vouchers/export?type=${type}`, `vouchers-${type || "all"}.csv`),
   concessions: (studentId = 0, year = "") => request<{ data: any[] }>(`/accounts/concessions?studentId=${studentId}&year=${year}`),
   createConcession: (payload: any) => request<{ data: any }>("/accounts/concessions", { method: "POST", body: JSON.stringify(payload) }),
   approveConcession: (id: number) => request<{ data: any }>(`/accounts/concessions/${id}/approve`, { method: "PATCH" }),
   rejectConcession: (id: number) => request<{ data: any }>(`/accounts/concessions/${id}/reject`, { method: "PATCH" }),
   dailyCollection: (date = "") => request<{ data: any }>(`/accounts/reports/daily-collection?date=${date}`),
   feeDefaulters: (year = "") => request<{ data: any[] }>(`/accounts/reports/fee-defaulters?year=${year}`),
-  feeDefaultersExport: (year = "") => apiPath(`/accounts/reports/fee-defaulters/export?year=${year}`),
+  feeDefaultersExport: (year = "") => downloadAuthenticatedFile(`/accounts/reports/fee-defaulters/export?year=${year}`, `fee-defaulters-${year || "all"}.csv`),
   monthlyCollection: (month = "") => request<{ data: any }>(`/accounts/reports/monthly-collection?month=${month}`),
   expenseReport: (month = "") => request<{ data: any }>(`/accounts/reports/expense?month=${month}`),
   cashFlow: (startDate = "", endDate = "") => request<{ data: any }>(`/accounts/reports/cash-flow?startDate=${startDate}&endDate=${endDate}`),
@@ -208,7 +245,7 @@ export const api = {
   removeEventParticipant: (eventId: number, studentId: number) => request<{ data: any }>(`/events/${eventId}/participants/${studentId}`, { method: "DELETE" }),
   updateAttendance: (id: number, records: any[]) => request<{ data: any }>(`/events/${id}/attendance`, { method: "PATCH", body: JSON.stringify({ records }) }),
   uploadEventMedia: (id: number, payload: FormData) => request<{ data: any }>(`/events/${id}/media`, { method: "POST", body: payload }),
-  downloadEventMedia: (id: number) => apiPath(`/events/media/${id}/download`),
+  downloadEventMedia: (id: number) => downloadAuthenticatedFile(`/events/media/${id}/download`, `event-media-${id}`),
   deleteEventMedia: (id: number) => request<{ data: any }>(`/events/media/${id}`, { method: "DELETE" }),
   eventFolders: (eventId: number) => request<{ data: any[] }>(`/events/${eventId}/folders`),
   createEventFolder: (eventId: number, payload: any) => request<{ data: any }>(`/events/${eventId}/folders`, { method: "POST", body: JSON.stringify(payload) }),

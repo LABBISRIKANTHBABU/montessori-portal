@@ -109,10 +109,10 @@ router.post("/students/:studentId/certificates", requirePermission("certificate.
        parsed.data.academicYear || null, qrCodeData, req.auth!.userId, parsed.data.reason || null]
     );
 
-    if (parsed.data.certificateType === "transfer" && student.current_status !== "withdrawn") {
-      await query("UPDATE v2_students SET current_status = 'withdrawn' WHERE id = ?", [req.params.studentId]);
+    if (parsed.data.certificateType === "transfer" && student.current_status !== "transferred") {
+      await query("UPDATE v2_students SET current_status = 'transferred' WHERE id = ?", [req.params.studentId]);
       await query(
-        "INSERT INTO v2_student_status_history (student_id, old_status, new_status, reason, changed_by) VALUES (?, ?, 'withdrawn', ?, ?)",
+        "INSERT INTO v2_student_status_history (student_id, old_status, new_status, reason, changed_by) VALUES (?, ?, 'transferred', ?, ?)",
         [req.params.studentId, student.current_status, `TC issued: ${certNumber}`, req.auth!.userId]
       );
     }
@@ -190,8 +190,12 @@ router.post("/bulk", requirePermission("certificate.generate"), async (req: Auth
            parsed.data.academicYear || null, qrCodeData, req.auth!.userId, parsed.data.reason || null]
         );
 
-        if (parsed.data.certificateType === "transfer" && student.current_status !== "withdrawn") {
-          await query("UPDATE v2_students SET current_status = 'withdrawn' WHERE id = ?", [studentId]);
+        if (parsed.data.certificateType === "transfer" && student.current_status !== "transferred") {
+          await query("UPDATE v2_students SET current_status = 'transferred' WHERE id = ?", [studentId]);
+          await query(
+            "INSERT INTO v2_student_status_history (student_id, old_status, new_status, reason, changed_by) VALUES (?, ?, 'transferred', ?, ?)",
+            [studentId, student.current_status, parsed.data.reason || "Transfer certificate issued", req.auth!.userId],
+          );
         }
 
         results.push({

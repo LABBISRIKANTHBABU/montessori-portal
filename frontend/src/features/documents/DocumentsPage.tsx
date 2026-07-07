@@ -24,6 +24,7 @@ export default function DocumentsPage() {
   const [replaceFile, setReplaceFile] = useState<File | null>(null);
   const [versionsDocId, setVersionsDocId] = useState<number | null>(null);
   const [versions, setVersions] = useState<any[]>([]);
+  const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -96,15 +97,24 @@ export default function DocumentsPage() {
     } catch (err: any) { alert(err.message || "Download failed"); }
   }
 
-  async function handlePreview(docId: number) {
+  async function handlePreview(docId: number, name = "Document preview") {
     try {
       const blob = await api.previewDocument(docId);
       const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener,noreferrer");
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setPreview(current => {
+        if (current?.url) URL.revokeObjectURL(current.url);
+        return { url, name };
+      });
     } catch (err: any) {
       alert(err.message || "Preview failed");
     }
+  }
+
+  function closePreview() {
+    setPreview(current => {
+      if (current?.url) URL.revokeObjectURL(current.url);
+      return null;
+    });
   }
 
   async function handleArchive(docId: number) {
@@ -263,7 +273,7 @@ export default function DocumentsPage() {
                     <td>{doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : "—"}</td>
                     <td>{doc.uploadedByName || "—"}</td>
                     <td className="actions-cell">
-                      <button className="icon-button" title="Preview" onClick={() => handlePreview(doc.id)}><Eye size={15} /></button>
+                      <button className="icon-button" title="Preview" onClick={() => handlePreview(doc.id, doc.documentName || doc.originalFilename)}><Eye size={15} /></button>
                       <button className="icon-button" title="Download" onClick={() => handleDownload(doc.id, doc.originalFilename)}><Download size={15} /></button>
                       <button className="icon-button" title="Replace" onClick={() => { setReplaceDocId(doc.id); setReplaceFile(null); }}><Replace size={15} /></button>
                       <button className="icon-button" title="Archive" onClick={() => handleArchive(doc.id)}><Archive size={15} /></button>
@@ -385,6 +395,18 @@ export default function DocumentsPage() {
                 Replace with new version
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {preview && (
+        <div className="modal-overlay document-preview-overlay" onClick={closePreview}>
+          <div className="document-preview-panel" onClick={event => event.stopPropagation()}>
+            <div className="modal-header">
+              <div><span className="step-label">DOCUMENT PREVIEW</span><h2>{preview.name}</h2></div>
+              <button className="icon-button" aria-label="Close preview" onClick={closePreview}><X size={18} /></button>
+            </div>
+            <iframe src={preview.url} title={preview.name} />
           </div>
         </div>
       )}

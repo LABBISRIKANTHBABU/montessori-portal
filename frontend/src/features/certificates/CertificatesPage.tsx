@@ -3,13 +3,13 @@ import { Plus, Search, Download, Eye, Ban, FileBadge2, ExternalLink, History, X,
 import { api, Student } from "../../api";
 
 const CERT_TYPES = [
-  { value: "transfer", label: "Transfer Certificate" },
-  { value: "study", label: "Study Certificate" },
-  { value: "bonafide", label: "Bonafide Certificate" },
-  { value: "conduct", label: "Conduct Certificate" },
-  { value: "fee", label: "Fee Certificate" },
-  { value: "participation", label: "Participation Certificate" },
-  { value: "achievement", label: "Achievement Certificate" },
+  { value: "transfer", label: "Transfer Certificate", description: "Official school leaving and transfer record." },
+  { value: "study", label: "Study Certificate", description: "Confirmation of current or previous study." },
+  { value: "bonafide", label: "Bonafide Certificate", description: "Verified student identity and enrollment." },
+  { value: "conduct", label: "Conduct Certificate", description: "Student conduct and character statement." },
+  { value: "fee", label: "Fee Certificate", description: "Certified fee payment and dues record." },
+  { value: "participation", label: "Participation Certificate", description: "Recognition for event participation." },
+  { value: "achievement", label: "Achievement Certificate", description: "Recognition of academic or activity merit." },
 ];
 
 export default function CertificatesPage() {
@@ -144,6 +144,27 @@ export default function CertificatesPage() {
           </button>
         </div>
       </div>
+
+      <section className="certificate-template-section">
+        <div className="section-heading">
+          <div><span className="step-label">CERTIFICATE TEMPLATES</span><h2>Start from an approved format</h2></div>
+          <span>{CERT_TYPES.length} templates</span>
+        </div>
+        <div className="certificate-template-grid">
+          {CERT_TYPES.map(template => (
+            <article className="certificate-template-card" key={template.value}>
+              <div className="template-preview"><FileBadge2 size={30} /></div>
+              <div>
+                <h3>{template.label}</h3>
+                <p>{template.description}</p>
+              </div>
+              <button className="secondary-button" onClick={() => { setCertType(template.value); setShowGenerate(true); }}>
+                Generate <Plus size={16} />
+              </button>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <section className="panel table-panel">
         <div className="table-tools">

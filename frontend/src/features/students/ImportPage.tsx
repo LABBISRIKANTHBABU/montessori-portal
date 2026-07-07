@@ -242,12 +242,13 @@ export default function ImportPage() {
     imported: selected.imported_rows || 0,
   } : null;
 
-  const steps: { id: WizardStep; label: string; icon: any }[] = [
+  const steps: { id: string; label: string; icon: any }[] = [
     { id: "upload", label: "Upload", icon: Upload },
-    { id: "mapping", label: "Map Headers", icon: FileText },
+    { id: "mapping", label: "Map Columns", icon: FileText },
+    { id: "validate", label: "Validate", icon: Check },
     { id: "preview", label: "Preview", icon: Eye },
     { id: "approve", label: "Approve", icon: Check },
-    { id: "summary", label: "Summary", icon: FileBadge2 },
+    { id: "summary", label: "Completed", icon: FileBadge2 },
   ];
 
   const currentStepIdx = steps.findIndex(s => s.id === step);

@@ -52,6 +52,10 @@ export default function StudentsPage() {
       } else if (bulkAction === "assign-section") {
         if (!bulkValue) { alert("Enter section name."); setBulkLoading(false); return; }
         await api.bulkAssign(selectedIds, "section", bulkValue);
+      } else if (bulkAction === "graduate-alumni") {
+        if (!confirm("Move the selected active Grade 10 students to Alumni? Non-Grade 10 records will be skipped.")) return;
+        const result = await api.bulkGraduateGradeTen(selectedIds);
+        alert(`${result.data.graduated} student(s) moved to Alumni. ${result.data.skipped} skipped.`);
       }
       setSelectedIds([]);
       setBulkAction("");
@@ -109,9 +113,9 @@ export default function StudentsPage() {
               <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                 <option value="">All statuses</option>
                 <option value="active">Active</option>
+                <option value="dropped">Dropped</option>
+                <option value="transferred">Transferred</option>
                 <option value="alumni">Alumni</option>
-                <option value="withdrawn">Withdrawn</option>
-                <option value="suspended">Suspended</option>
                 <option value="inactive">Inactive</option>
               </select>
             </div>
@@ -132,6 +136,7 @@ export default function StudentsPage() {
                   <option value="promote">Promote to class</option>
                   <option value="assign-class">Assign class</option>
                   <option value="assign-section">Assign section</option>
+                  <option value="graduate-alumni">Complete Grade 10 → Alumni</option>
                 </select>
               </div>
               {(bulkAction === "promote" || bulkAction === "assign-class" || bulkAction === "assign-section") && (
@@ -153,15 +158,17 @@ export default function StudentsPage() {
                 <th>Student</th>
                 <th>Admission no.</th>
                 <th>Class</th>
+                <th>Section</th>
+                <th>Parent phone</th>
                 <th>Status</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} style={{textAlign: "center", padding: "2rem"}}>Loading directory...</td></tr>
+                <tr><td colSpan={8} style={{textAlign: "center", padding: "2rem"}}>Loading directory...</td></tr>
               ) : students.length === 0 ? (
-                <tr><td colSpan={6}><EmptyState icon={<Users size={40} />} title="No students found" description="Try adjusting your search or filters" /></td></tr>
+                <tr><td colSpan={8}><EmptyState icon={<Users size={40} />} title="No students found" description="Try adjusting your search or filters" /></td></tr>
               ) : (
                 students.map(student => <StudentRow key={student.id} student={student} selected={selectedIds.includes(student.id)} onToggle={() => toggleSelect(student.id)} onNavigate={navigate} />)
               )}
@@ -188,7 +195,9 @@ const StudentRow = memo(function StudentRow({ student, selected, onToggle, onNav
         </div>
       </td>
       <td>{student.admissionNo}</td>
-      <td>{student.className} · {student.sectionName}</td>
+      <td>{student.className}</td>
+      <td>{student.sectionName}</td>
+      <td>{student.guardianPhone || "—"}</td>
       <td><span className={`status-badge ${student.status}`}>{student.status}</span></td>
       <td className="actions-cell">
         <button className="text-button" onClick={() => onNavigate(`/students/${student.id}`)}>View</button>

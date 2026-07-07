@@ -152,7 +152,7 @@ export default function FeeCollection({ studentId, studentName }: FeeCollectionP
                   <td>₹{Number(p.amount).toLocaleString()}</td>
                   <td>{p.paymentMode || "—"}</td>
                   <td><strong>{p.receiptNumber || "—"}</strong></td>
-                  <td><a href={api.receiptPreview(p.id)} target="_blank" rel="noreferrer" className="icon-button" title="View receipt"><Eye size={14} /></a></td>
+                  <td><button onClick={() => void api.receiptPreview(p.id)} className="icon-button" title="View receipt"><Eye size={14} /></button></td>
                 </tr>
               ))
             )}

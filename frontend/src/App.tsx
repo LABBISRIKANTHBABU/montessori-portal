@@ -4,23 +4,29 @@ import {
   ArrowRight, Award, BarChart3, Bell, Calendar, ChevronDown, CircleHelp, FileBadge2,
   GraduationCap, LayoutDashboard, LogOut, Menu, Plus, Search, Settings, Sparkles,
   Upload, UserRound, Users, WalletCards, X, Shield, Building2, CheckCircle2,
-  AlertTriangle, Clock, CreditCard, FileText
+  AlertTriangle, Clock, CreditCard, FileText, Moon
 } from "lucide-react";
 import { api, apiConfigurationError, DashboardData, GroupOverview, School, SearchResult, Notification, schoolScope, token } from "./api";
 import { ToastProvider } from "./components/Toast";
-import StudentCreatePage from "./features/students/StudentCreatePage";
-import StudentsPage from "./features/students/StudentsPage";
-import StudentProfilePage from "./features/students/StudentProfilePage";
-import ImportPage from "./features/students/ImportPage";
-import DocumentsPage from "./features/documents/DocumentsPage";
-import CertificatesPage from "./features/certificates/CertificatesPage";
-import AccountsPage from "./features/accounts/AccountsPage";
-import EventsPage from "./features/events/EventsPage";
-import ReportsPage from "./features/reports/ReportsPage";
-import UsersPageFull from "./features/users/UsersPage";
-import SettingsPage from "./features/settings/SettingsPage";
 
-type Session = { user: { name: string; role: string }; school: School } | null;
+const StudentCreatePage = React.lazy(() => import("./features/students/StudentCreatePage"));
+const StudentsPage = React.lazy(() => import("./features/students/StudentsPage"));
+const StudentProfilePage = React.lazy(() => import("./features/students/StudentProfilePage"));
+const ImportPage = React.lazy(() => import("./features/students/ImportPage"));
+const DocumentsPage = React.lazy(() => import("./features/documents/DocumentsPage"));
+const CertificatesPage = React.lazy(() => import("./features/certificates/CertificatesPage"));
+const AccountsPage = React.lazy(() => import("./features/accounts/AccountsPage"));
+const EventsPage = React.lazy(() => import("./features/events/EventsPage"));
+const ReportsPage = React.lazy(() => import("./features/reports/ReportsPage"));
+const UsersPageFull = React.lazy(() => import("./features/users/UsersPage"));
+const SettingsPage = React.lazy(() => import("./features/settings/SettingsPage"));
+
+const GROUP_LOGO = "/montessori-golden-jubilee-logo.jpeg";
+
+type Session = {
+  user: { name: string; role: string; roleCode: string; permissions: string[] };
+  school: School;
+} | null;
 
 // ─── Error Boundary ─────────────────────────────────────────────────────
 
@@ -117,6 +123,22 @@ function App() {
     const raw = localStorage.getItem("monte_session");
     return raw ? JSON.parse(raw) : null;
   });
+  useEffect(() => {
+    if (!session || (session.user.permissions?.length && session.user.roleCode)) return;
+    api.accessModel().then(({ data }) => {
+      const upgraded = {
+        ...session,
+        user: { ...session.user, roleCode: data.role, permissions: data.permissions },
+      };
+      setSession(upgraded);
+      localStorage.setItem("monte_session", JSON.stringify(upgraded));
+    }).catch(() => {
+      token.clear();
+      schoolScope.clear();
+      localStorage.removeItem("monte_session");
+      setSession(null);
+    });
+  }, [session]);
   const signIn = (next: NonNullable<Session>) => {
     if (next.user.role === "Group Super Admin") schoolScope.set(next.school.id);
     else schoolScope.clear();
@@ -139,6 +161,8 @@ function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/login/:schoolId" element={session ? <Navigate to="/dashboard" /> : <Login onLogin={signIn} isSuperAdmin={false} />} />
             <Route path="/super-admin" element={session ? <Navigate to="/dashboard" /> : <Login onLogin={signIn} isSuperAdmin={true} />} />
+            <Route path="/forgot-password" element={session ? <Navigate to="/dashboard" /> : <PasswordRecovery mode="request" />} />
+            <Route path="/reset-password" element={session ? <Navigate to="/dashboard" /> : <PasswordRecovery mode="reset" />} />
             <Route path="/*" element={session ? <Portal session={session} onLogout={signOut} /> : <Navigate to="/" />} />
           </Routes>
         </Suspense>
@@ -149,6 +173,40 @@ function App() {
 
 // ─── Landing Page ────────────────────────────────────────────────────────
 // School cards, search, super admin card. No login form, no demo stats.
+
+function ApiConnectionStatus({ compact = false }: { compact?: boolean }) {
+  const [state, setState] = useState<"checking" | "online" | "degraded" | "offline">("checking");
+  const [message, setMessage] = useState("Checking backend connection...");
+
+  useEffect(() => {
+    let cancelled = false;
+    api.health()
+      .then(result => {
+        if (cancelled) return;
+        if (result.checks?.database === false || result.database?.ok === false) {
+          setState("degraded");
+          setMessage(result.message || "Backend is running, but database health is not confirmed.");
+          return;
+        }
+        setState("online");
+        setMessage(`Backend connected${result.database?.latencyMs !== undefined ? ` · DB ${result.database.latencyMs}ms` : ""}`);
+      })
+      .catch(error => {
+        if (cancelled) return;
+        setState("offline");
+        setMessage(error instanceof Error ? error.message : "Backend is not reachable.");
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const Icon = state === "online" ? CheckCircle2 : state === "checking" ? Clock : AlertTriangle;
+  return (
+    <div className={`api-status api-status-${state}${compact ? " compact" : ""}`} role="status" aria-live="polite">
+      <Icon size={compact ? 14 : 17} />
+      <span>{message}</span>
+    </div>
+  );
+}
 
 function Landing() {
   const navigate = useNavigate();
@@ -179,6 +237,7 @@ function Landing() {
         <span className="eyebrow">MONTESSORI GROUP OF SCHOOLS</span>
         <h1>Select your campus</h1>
         <p>Choose your school to sign in to your workspace.</p>
+        <ApiConnectionStatus />
         <div className="search-bar-large">
           <Search size={20} />
           <input
@@ -194,7 +253,9 @@ function Landing() {
         {loadError && <div className="form-error" role="alert">{loadError}</div>}
         {filtered.map(school => (
           <button key={school.id} className="school-card" onClick={() => navigate(`/login/${school.id}`)}>
-            <div className="school-icon"><GraduationCap size={24} /></div>
+            <div className="school-icon">
+              <img src={GROUP_LOGO} alt="" aria-hidden="true" />
+            </div>
             <div className="school-details">
               <strong>{school.name}</strong>
               <small><Building2 size={13} /> {school.city}</small>
@@ -268,6 +329,7 @@ function Login({ onLogin, isSuperAdmin }: { onLogin: (session: NonNullable<Sessi
           <span className="step-label">{isSuperAdmin ? "SUPER ADMIN ACCESS" : "STAFF LOGIN"}</span>
           <h2>{isSuperAdmin ? "Platform Admin" : "Sign in"}</h2>
           <p className="muted">Enter your credentials to access the portal.</p>
+          <ApiConnectionStatus compact />
           <label>
             Email address
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" />
@@ -276,6 +338,13 @@ function Login({ onLogin, isSuperAdmin }: { onLogin: (session: NonNullable<Sessi
             Password
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" />
           </label>
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => navigate(`/forgot-password?schoolId=${schoolId}&email=${encodeURIComponent(email)}`)}
+          >
+            Forgot password?
+          </button>
           {error && <div className="form-error">{error}</div>}
           <button className="primary-button wide" disabled={loading}>
             {loading ? "Signing in..." : "Sign in"} <ArrowRight size={18} />
@@ -286,33 +355,100 @@ function Login({ onLogin, isSuperAdmin }: { onLogin: (session: NonNullable<Sessi
   );
 }
 
-// ─── Change Password ─────────────────────────────────────────────────────
+function PasswordRecovery({ mode }: { mode: "request" | "reset" }) {
+  const navigate = useNavigate();
+  const params = new URLSearchParams(useLocation().search);
+  const schoolId = Number(params.get("schoolId") || 0);
+  const resetToken = params.get("token") || "";
+  const [email, setEmail] = useState(params.get("email") || "");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+    if (mode === "reset" && password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = mode === "request"
+        ? await api.forgotPassword({ schoolId, email })
+        : await api.resetOwnPassword({ schoolId, token: resetToken, newPassword: password });
+      setMessage(result.message);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Password recovery failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="login-page">
+      <button className="back-link" onClick={() => navigate(schoolId ? `/login/${schoolId}` : "/super-admin")}>
+        <ArrowRight size={15} /> Back to sign in
+      </button>
+      <section className="login-intro">
+        <Brand light />
+        <div>
+          <span className="eyebrow light">SECURE ACCOUNT RECOVERY</span>
+          <h1>{mode === "request" ? "Reset your password" : "Choose a new password"}</h1>
+          <p>Recovery links are single-use and expire after 30 minutes.</p>
+        </div>
+      </section>
+      <section className="login-panel">
+        <form onSubmit={submit}>
+          <span className="step-label">PASSWORD RECOVERY</span>
+          <h2>{mode === "request" ? "Find your account" : "Create new password"}</h2>
+          {mode === "request" ? (
+            <label>Email address<input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" /></label>
+          ) : (
+            <>
+              <label>New password<input type="password" minLength={8} value={password} onChange={e => setPassword(e.target.value)} required autoComplete="new-password" /></label>
+              <label>Confirm password<input type="password" minLength={8} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required autoComplete="new-password" /></label>
+            </>
+          )}
+          {error && <div className="form-error">{error}</div>}
+          {message && <div className="status-message success">{message}</div>}
+          <button className="primary-button wide" disabled={loading || (mode === "reset" && !resetToken)}>
+            {loading ? "Please wait..." : mode === "request" ? "Send reset link" : "Update password"} <ArrowRight size={18} />
+          </button>
+        </form>
+      </section>
+    </main>
+  );
+}
 
 // ─── Navigation Config ───────────────────────────────────────────────────
 
 const navItems = [
-  ["dashboard", "Overview", LayoutDashboard],
-  ["students", "Students", Users],
-  ["certificates", "Certificates", FileBadge2],
-  ["fees", "Fees & Accounts", WalletCards],
-  ["documents", "Documents", FileBadge2],
-  ["events", "Events", Calendar],
-  ["reports", "Reports", BarChart3],
-  ["users", "Staff & Roles", Users],
-  ["settings", "Settings", Settings]
+  ["dashboard", "Overview", LayoutDashboard, "dashboard.view"],
+  ["students", "Students", Users, "student.view"],
+  ["certificates", "Certificates", FileBadge2, "certificate.view"],
+  ["fees", "Fees & Accounts", WalletCards, "account.view"],
+  ["documents", "Documents", FileBadge2, "student.document.upload"],
+  ["events", "Events", Calendar, "event.view"],
+  ["reports", "Reports", BarChart3, "report.view"],
+  ["users", "Staff & Roles", Users, "user.manage"],
+  ["settings", "Settings", Settings, "settings.view"]
 ] as const;
 
 const superAdminNavItems = [
-  ["dashboard", "Platform Overview", LayoutDashboard],
-  ["schools", "Campuses", GraduationCap],
-  ["students", "Students", Users],
-  ["certificates", "Certificates", FileBadge2],
-  ["fees", "Fees & Accounts", WalletCards],
-  ["documents", "Documents", FileText],
-  ["events", "Events", Calendar],
-  ["users", "Staff & Roles", Users],
-  ["reports", "Global Reports", BarChart3],
-  ["settings", "School Settings", Settings],
+  ["dashboard", "Platform Overview", LayoutDashboard, "dashboard.view"],
+  ["schools", "Campuses", GraduationCap, "dashboard.view"],
+  ["students", "Students", Users, "student.view"],
+  ["certificates", "Certificates", FileBadge2, "certificate.view"],
+  ["fees", "Fees & Accounts", WalletCards, "account.view"],
+  ["documents", "Documents", FileText, "student.document.upload"],
+  ["events", "Events", Calendar, "event.view"],
+  ["users", "Staff & Roles", Users, "user.manage"],
+  ["reports", "Global Reports", BarChart3, "report.view"],
+  ["settings", "School Settings", Settings, "settings.view"],
 ] as const;
 
 // ─── Portal (Main App Shell) ─────────────────────────────────────────────
@@ -326,6 +462,11 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
   const managingImports = location.pathname === "/students/imports";
   const studentId = /^\/students\/(\d+)$/.exec(location.pathname)?.[1];
   const isSuperAdmin = session.user.role === "Group Super Admin";
+  const permissions = new Set(session.user.permissions || []);
+  const configuredNavItems = isSuperAdmin ? superAdminNavItems : navItems;
+  const visibleNavItems = configuredNavItems.filter(([, , , permission]) => permissions.has(permission));
+  const currentNavItem = configuredNavItems.find(([path]) => path === current);
+  const canOpenCurrentModule = !currentNavItem || permissions.has(currentNavItem[3]);
   const [availableSchools, setAvailableSchools] = useState<School[]>([session.school]);
   const [activeSchool, setActiveSchool] = useState<School>(session.school);
   const scopedSession = { ...session, school: activeSchool };
@@ -407,7 +548,9 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
           <button className="icon-button mobile-only" onClick={() => setMenu(false)}><X /></button>
         </div>
         <div className="campus-card">
-          <span className="campus-mark">{activeSchool.code.slice(0, 2)}</span>
+          <span className="campus-mark">
+            <img src={GROUP_LOGO} alt="" aria-hidden="true" />
+          </span>
           <div>
             <small>{isSuperAdmin ? "OPERATING CAMPUS" : "ASSIGNED CAMPUS"}</small>
             {isSuperAdmin ? (
@@ -427,7 +570,7 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
         </div>
         <nav>
           <span className="nav-label">WORKSPACE</span>
-          {(isSuperAdmin ? superAdminNavItems : navItems).map(([path, label, Icon]) => (
+          {visibleNavItems.map(([path, label, Icon]) => (
             <button key={path} className={current === path ? "active" : ""} onClick={() => { navigate(`/${path}`); setMenu(false); }}>
               <Icon size={19} /> {label}
             </button>
@@ -486,10 +629,29 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
               </div>
             )}
           </div>
+          <div className="global-school-context">
+            <span className="context-label">Current school</span>
+            {isSuperAdmin ? (
+              <select
+                aria-label="Current school"
+                value={activeSchool.id}
+                onChange={event => {
+                  const selected = availableSchools.find(school => school.id === Number(event.target.value));
+                  if (selected) selectCampus(selected);
+                }}
+              >
+                {availableSchools.map(school => <option key={school.id} value={school.id}>{school.name}</option>)}
+              </select>
+            ) : <strong>{activeSchool.name}</strong>}
+          </div>
+          <div className="academic-context" title="Current academic year">
+            <small>Academic year</small>
+            <strong>2026–27</strong>
+          </div>
           <div className="header-actions">
-            <button className="icon-button"><CircleHelp size={19} /></button>
+            <button className="icon-button" aria-label="Help" title="Help"><CircleHelp size={19} /></button>
             <div ref={notifRef} style={{ position: "relative" }}>
-              <button className="icon-button alert" onClick={() => setNotifOpen(o => !o)} style={{ position: "relative" }}>
+              <button className="icon-button alert" aria-label="Notifications" title="Notifications" onClick={() => setNotifOpen(o => !o)} style={{ position: "relative" }}>
                 <Bell size={19} />
                 {unreadCount > 0 && (
                   <span style={{
@@ -529,10 +691,19 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
                 </div>
               )}
             </div>
-            <span className="year-pill">2026–27 <ChevronDown size={15} /></span>
+            <button className="icon-button" aria-label="Settings" title="Settings" onClick={() => navigate("/settings")}><Settings size={19} /></button>
+            <button className="icon-button future-control" aria-label="Dark mode coming soon" title="Dark mode coming soon"><Moon size={18} /></button>
+            <div className="header-profile" title={`${session.user.name} · ${session.user.role}`}>
+              <span>{session.user.name.split(" ").map(part => part[0]).join("").slice(0, 2).toUpperCase()}</span>
+              <div><strong>{session.user.name}</strong><small>{session.user.role}</small></div>
+            </div>
           </div>
         </header>
-        <React.Fragment key={`${activeSchool.id}:${current}`}>
+        {!canOpenCurrentModule ? (
+          <div className="page">
+            <div className="form-error" role="alert">You do not have permission to open this module.</div>
+          </div>
+        ) : <React.Fragment key={`${activeSchool.id}:${current}`}>
           {current === "dashboard" && (isSuperAdmin
             ? <SuperAdminDashboard session={scopedSession} activeSchool={activeSchool} onSelectCampus={selectCampus} />
             : <Dashboard session={scopedSession} />)}
@@ -546,9 +717,9 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
           {current === "reports" && <ReportsPage />}
           {current === "settings" && <SettingsPage />}
           {!["dashboard", "students", "schools", "users", "certificates", "fees", "documents", "events", "reports", "settings"].includes(current) && (
-            <ModulePlaceholder name={(isSuperAdmin ? superAdminNavItems : navItems).find(n => n[0] === current)?.[1] || "Module"} />
+            <ModulePlaceholder name={configuredNavItems.find(n => n[0] === current)?.[1] || "Module"} />
           )}
-        </React.Fragment>
+        </React.Fragment>}
       </main>
     </div>
   );
@@ -1009,7 +1180,9 @@ function ModulePlaceholder({ name }: { name: string }) {
 function Brand({ light = false }: { light?: boolean }) {
   return (
     <div className={light ? "brand light" : "brand"}>
-      <span className="brand-mark"><i /><i /><i /></span>
+      <span className="brand-logo-shell">
+        <img className="brand-logo" src={GROUP_LOGO} alt="Montessori Golden Jubilee emblem" />
+      </span>
       <div><strong>Montessori</strong><small>SCHOOL PORTAL</small></div>
     </div>
   );

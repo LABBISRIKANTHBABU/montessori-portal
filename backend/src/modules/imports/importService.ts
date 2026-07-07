@@ -171,7 +171,7 @@ export async function rollbackBatch(context:{schoolId:number;userId:number},id:s
   const [importedRows]=await getPool().execute<RowDataPacket[]>("SELECT imported_student_id FROM v2_import_rows WHERE batch_id=? AND row_status='imported' AND imported_student_id IS NOT NULL",[id]);
   const studentIds=importedRows.map(r=>r.imported_student_id).filter(Boolean);
   if(studentIds.length){
-    await getPool().execute(`UPDATE v2_students SET deleted_at=UTC_TIMESTAMP(), current_status='withdrawn' WHERE id IN (${studentIds.map(()=>"?").join(",")})`,studentIds);
+    await getPool().execute(`UPDATE v2_students SET deleted_at=UTC_TIMESTAMP(), current_status='inactive' WHERE id IN (${studentIds.map(()=>"?").join(",")})`,studentIds);
     await getPool().execute(`UPDATE v2_admissions SET status='revoked' WHERE student_id IN (${studentIds.map(()=>"?").join(",")})`,studentIds);
   }
   await getPool().execute("UPDATE v2_import_rows SET row_status='error',errors_json=JSON_ARRAY('Rolled back'),imported_student_id=NULL WHERE batch_id=? AND row_status='imported'",[id]);

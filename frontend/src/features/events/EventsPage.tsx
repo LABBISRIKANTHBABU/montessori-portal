@@ -110,6 +110,7 @@ function EventsDashboard({ onNavigate }: { onNavigate: (tab: string) => void }) 
 function DashCard({ icon, label, value, color, onClick }: { icon: React.ReactNode; label: string; value: string; color: string; onClick?: () => void }) {
   return (
     <div
+      className="erp-stat-card"
       onClick={onClick}
       style={{ padding: 16, background: "var(--cream)", borderRadius: 8, display: "flex", alignItems: "flex-start", gap: 12, cursor: onClick ? "pointer" : "default" }}
     >
@@ -569,9 +570,9 @@ function EventDetail({ event: ev, onRefresh }: { event: any; onRefresh: () => vo
                     <small style={{ color: "var(--muted)", fontSize: 10, textAlign: "center", padding: "0 4px" }}>{m.filename}</small>
                   </div>
                   <div style={{ position: "absolute", top: 4, right: 4, display: "flex", gap: 4 }}>
-                    <a href={api.downloadEventMedia(m.id)} className="icon-button" style={{ background: "rgba(255,255,255,0.9)", padding: 4 }} onClick={e => e.stopPropagation()}>
+                    <button className="icon-button" style={{ background: "rgba(255,255,255,0.9)", padding: 4 }} onClick={e => { e.stopPropagation(); void api.downloadEventMedia(m.id); }}>
                       <Download size={12} />
-                    </a>
+                    </button>
                     <button className="icon-button" style={{ background: "rgba(255,255,255,0.9)", padding: 4 }} onClick={e => { e.stopPropagation(); deleteMedia(m.id); }}>
                       <Trash2 size={12} />
                     </button>
@@ -600,7 +601,7 @@ function EventDetail({ event: ev, onRefresh }: { event: any; onRefresh: () => vo
                       <td>{m.createdAt ? new Date(m.createdAt).toLocaleDateString() : "—"}</td>
                       <td>
                         <div style={{ display: "flex", gap: 4 }}>
-                          <a href={api.downloadEventMedia(m.id)} className="icon-button"><Download size={14} /></a>
+                          <button onClick={() => void api.downloadEventMedia(m.id)} className="icon-button"><Download size={14} /></button>
                           <button className="icon-button" onClick={() => deleteMedia(m.id)}><Trash2 size={14} /></button>
                         </div>
                       </td>
@@ -798,9 +799,9 @@ function EventDetail({ event: ev, onRefresh }: { event: any; onRefresh: () => vo
             <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <strong>{previewMedia.filename}</strong>
               <div style={{ display: "flex", gap: 8 }}>
-                <a href={api.downloadEventMedia(previewMedia.id)} className="secondary-button" style={{ textDecoration: "none" }}>
+                <button onClick={() => void api.downloadEventMedia(previewMedia.id)} className="secondary-button">
                   <Download size={14} /> Download
-                </a>
+                </button>
                 <button className="icon-button" onClick={() => setPreviewMedia(null)}><X size={18} /></button>
               </div>
             </div>
@@ -1105,9 +1106,9 @@ function EventsGallery() {
                         <small style={{ color: "var(--muted)", fontSize: 10, textAlign: "center", padding: "0 4px" }}>{m.filename}</small>
                       </div>
                       <div style={{ position: "absolute", top: 4, right: 4 }}>
-                        <a href={api.downloadEventMedia(m.id)} className="icon-button" style={{ background: "rgba(255,255,255,0.9)", padding: 4 }} onClick={e => e.stopPropagation()}>
+                        <button className="icon-button" style={{ background: "rgba(255,255,255,0.9)", padding: 4 }} onClick={e => { e.stopPropagation(); void api.downloadEventMedia(m.id); }}>
                           <Download size={12} />
-                        </a>
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1126,7 +1127,7 @@ function EventsGallery() {
                           <td>{m.fileSize ? `${(m.fileSize / 1024).toFixed(1)} KB` : "—"}</td>
                           <td>{m.caption || "—"}</td>
                           <td>
-                            <a href={api.downloadEventMedia(m.id)} className="icon-button"><Download size={14} /></a>
+                            <button onClick={() => void api.downloadEventMedia(m.id)} className="icon-button"><Download size={14} /></button>
                           </td>
                         </tr>
                       ))}
@@ -1151,9 +1152,9 @@ function EventsGallery() {
             <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <strong>{previewMedia.filename}</strong>
               <div style={{ display: "flex", gap: 8 }}>
-                <a href={api.downloadEventMedia(previewMedia.id)} className="secondary-button" style={{ textDecoration: "none" }}>
+                <button onClick={() => void api.downloadEventMedia(previewMedia.id)} className="secondary-button">
                   <Download size={14} /> Download
-                </a>
+                </button>
                 <button className="icon-button" onClick={() => setPreviewMedia(null)}><X size={18} /></button>
               </div>
             </div>

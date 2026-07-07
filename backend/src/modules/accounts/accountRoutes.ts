@@ -181,8 +181,8 @@ router.post("/cashbook", requirePermission("account.manage"), async (req: AuthRe
   }).safeParse(req.body);
   if (!parsed.success) return res.status(422).json({ message: "Provide all required fields." });
   try {
-    const id = await addCashbookEntry(req.auth!.schoolId, req.auth!.userId, parsed.data);
-    res.status(201).json({ data: { id, message: "Entry recorded." } });
+    const result = await addCashbookEntry(req.auth!.schoolId, req.auth!.userId, parsed.data);
+    res.status(201).json({ data: { ...result, message: `Entry recorded and voucher ${result.voucherNumber} generated.` } });
   } catch (error) { next(error); }
 });
 

@@ -26,11 +26,23 @@ import reportRoutes from "./modules/reports/reportRoutes.js";
 import userRoutes from "./modules/users/userRoutes.js";
 import settingRoutes from "./modules/settings/settingRoutes.js";
 import { ensureStorageDirectory } from "./storage/storageService.js";
+import { requestPasswordReset, resetPassword } from "./modules/auth/passwordRecovery.js";
 
 const app = express();
 const config = getConfig();
 const port = config.PORT;
 app.set("trust proxy", config.NODE_ENV === "production" ? 1 : false);
+
+const serviceInfo = {
+  name: "Montessori Portal API",
+  status: "ok",
+  environment: config.NODE_ENV,
+  apiBasePath: "/api",
+  health: {
+    app: "/health",
+    database: "/api/health",
+  },
+};
 
 // ─── Brute Force Protection ──────────────────────────────────────────────
 
@@ -68,6 +80,18 @@ const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSiz
 
 app.use(helmet());
 const allowedOrigins = config.FRONTEND_ORIGIN.split(",").map(origin => origin.trim());
+function logStartupSummary() {
+  console.info("[STARTUP] Montessori Portal API booting", {
+    nodeEnv: config.NODE_ENV,
+    port,
+    databaseHost: config.DB_HOST,
+    databaseName: config.DB_NAME,
+    dbSsl: config.DB_SSL,
+    dbConnectionLimit: config.DB_CONNECTION_LIMIT,
+    allowedOrigins,
+    uploadRoot: config.UPLOAD_ROOT || "default-backend-uploads",
+  });
+}
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) callback(null, true);
@@ -107,8 +131,21 @@ app.use("/api/auth", rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHe
 
 // ─── Health ──────────────────────────────────────────────────────────────
 
+app.get("/", (_req, res) => {
+  res.json({
+    ...serviceInfo,
+    message: "Express is serving the Montessori Portal API. Use /api/* for application routes.",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString(), uptime: process.uptime() });
+  res.json({
+    ...serviceInfo,
+    checks: { app: true },
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
 });
 
 // ─── Auth Middleware ──────────────────────────────────────────────────────
@@ -145,8 +182,35 @@ async function authenticate(req: AuthRequest, res: Response, next: NextFunction)
 // ─── Health ──────────────────────────────────────────────────────────────
 
 app.get("/api/health", async (_req, res) => {
-  try { res.json({ status: "ok", mode: "database", database: await databaseHealth() }); }
-  catch { res.status(503).json({ status: "degraded", mode: "database", database: { ok: false } }); }
+  try {
+    res.json({
+      ...serviceInfo,
+      mode: "database",
+      checks: { app: true, database: true },
+      database: await databaseHealth(),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const typedError = error as Error & { code?: string };
+    console.error("[HEALTH] Database health check failed", { code: typedError.code, message: typedError.message });
+    res.status(503).json({
+      ...serviceInfo,
+      status: "degraded",
+      mode: "database",
+      checks: { app: true, database: false },
+      database: { ok: false },
+      message: "API is running, but the database connection is not healthy.",
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+app.get("/api", (_req, res) => {
+  res.json({
+    ...serviceInfo,
+    message: "API base path is ready. Use /api/health, /api/schools, and authenticated /api/* module routes.",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // ─── Auth Routes ─────────────────────────────────────────────────────────
@@ -172,6 +236,27 @@ app.post("/api/auth/login", async (req, res, next) => {
     loginAttempts.delete(bruteForceKey);
     return res.json(result);
   } catch (error) { return next(error); }
+});
+
+app.post("/api/auth/forgot-password", async (req, res, next) => {
+  const parsed = z.object({ schoolId: z.number().int().nonnegative(), email: z.email() }).safeParse(req.body);
+  if (!parsed.success) return res.status(422).json({ message: "Enter a valid school and email address." });
+  try {
+    await requestPasswordReset(parsed.data.schoolId, parsed.data.email, req.ip);
+    res.json({ message: "If that account exists, a password reset link has been sent." });
+  } catch (error) { next(error); }
+});
+
+app.post("/api/auth/reset-password", async (req, res, next) => {
+  const parsed = z.object({
+    schoolId: z.number().int().positive(),
+    token: z.string().length(64),
+    newPassword: z.string().min(8).max(128),
+  }).safeParse(req.body);
+  if (!parsed.success) return res.status(422).json({ message: "Use a valid reset link and a password of at least 8 characters." });
+  try {
+    res.json(await resetPassword(parsed.data.schoolId, parsed.data.token, parsed.data.newPassword));
+  } catch (error) { next(error); }
 });
 
 app.post("/api/auth/logout", (_req, res) => {
@@ -305,7 +390,7 @@ const studentSchema = z.object({
   bankIfscCode: z.preprocess(value => value === "" ? undefined : value, z.string().trim().toUpperCase().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, "Enter a valid IFSC code.").optional()),
   studentEmail: optionalEmail,
   residenceAddress: z.string().trim().min(5).max(500),
-  currentStatus: z.preprocess(value => value === "" ? undefined : value, z.enum(["active", "alumni", "withdrawn", "transferred", "inactive"]).optional()),
+  currentStatus: z.preprocess(value => value === "" ? undefined : value, z.enum(["active", "inactive", "dropped", "transferred", "alumni"]).optional()),
   classLeaving: optionalText(50),
   dateOfLeaving: optionalDate,
   leavingTcNo: optionalText(50),
@@ -350,7 +435,7 @@ app.put("/api/students/:id", authenticate, requirePermission("student.update"), 
 
 app.patch("/api/students/:id/status", authenticate, requirePermission("student.status.change"), async (req: AuthRequest, res, next) => {
   const parsed = z.object({
-    status: z.enum(["active", "alumni", "withdrawn", "suspended", "deleted", "inactive"]),
+    status: z.enum(["active", "inactive", "dropped", "transferred", "alumni"]),
     reason: z.string().max(255).optional()
   }).safeParse(req.body);
   if (!parsed.success) return res.status(422).json({ message: "Select a valid status." });
@@ -459,6 +544,14 @@ app.post("/api/students/bulk/assign", authenticate, requirePermission("student.u
   if (!parsed.success) return res.status(422).json({ message: "Provide student IDs, assign type and value." });
   try { res.json({ data: await repo.bulkAssignStudents(req.auth!.schoolId, parsed.data.studentIds, parsed.data.assignType, parsed.data.value, req.auth!.userId) }); }
   catch (error) { next(error); }
+});
+
+app.post("/api/students/bulk/graduate-grade-10", authenticate, requirePermission("student.status.change"), async (req: AuthRequest, res, next) => {
+  const parsed = z.object({ studentIds: z.array(z.number().int().positive()).min(1).max(500) }).safeParse(req.body);
+  if (!parsed.success) return res.status(422).json({ message: "Select between 1 and 500 Grade 10 students." });
+  try {
+    res.json({ data: await repo.bulkGraduateGradeTen(req.auth!.schoolId, parsed.data.studentIds, req.auth!.userId) });
+  } catch (error) { next(error); }
 });
 
 app.get("/api/students/check-duplicate", authenticate, requirePermission("student.view"), async (req: AuthRequest, res, next) => {
@@ -674,7 +767,13 @@ app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 if (process.env.NODE_ENV !== "test") {
-  const server = app.listen(port, () => console.log(`Montessori API listening on port ${port}`));
+  logStartupSummary();
+  const server = app.listen(port, () => {
+    console.info(`[STARTUP] Montessori API listening on port ${port}`);
+    void databaseHealth()
+      .then(health => console.info("[STARTUP] Database connected", health))
+      .catch((error: Error & { code?: string }) => console.error("[STARTUP] Database connection failed", { code: error.code, message: error.message }));
+  });
   const shutdown = () => {
     server.close(() => { void closePool().finally(() => process.exit(0)); });
   };

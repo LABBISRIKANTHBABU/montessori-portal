@@ -13,6 +13,7 @@ import { requirePermission } from "../../security/permissions.js";
 import type { AuthRequest } from "../../types/auth.js";
 import type { RowDataPacket } from "mysql2/promise";
 import { ensureStorageDirectory } from "../../storage/storageService.js";
+import { protectSettingValue, SECRET_SETTING_KEYS } from "../../security/settingSecrets.js";
 
 const router = Router();
 const settingsUploadDir = ensureStorageDirectory("settings");
@@ -39,7 +40,7 @@ router.get("/", requirePermission("settings.view"), async (req: AuthRequest, res
       [req.auth!.schoolId]
     );
     const settings: Record<string, string | null> = {};
-    for (const row of rows) settings[row.keyName] = row.value;
+    for (const row of rows) settings[row.keyName] = SECRET_SETTING_KEYS.has(row.keyName) && row.value ? "••••••••" : row.value;
     res.json({ data: settings });
   } catch (error) { next(error); }
 });
@@ -48,11 +49,16 @@ router.get("/", requirePermission("settings.view"), async (req: AuthRequest, res
 router.put("/:key", requirePermission("settings.manage"), async (req: AuthRequest, res, next) => {
   const parsed = z.object({ value: z.string().max(2000) }).safeParse(req.body);
   if (!parsed.success) return res.status(422).json({ message: "Invalid value." });
+  const settingKey = String(req.params.key);
+  if (SECRET_SETTING_KEYS.has(settingKey) && parsed.data.value === "••••••••") {
+    return res.json({ data: { message: "Secret unchanged." } });
+  }
   try {
+    const storedValue = protectSettingValue(settingKey, parsed.data.value);
     await query(
       `INSERT INTO v2_school_settings (school_id, setting_key, setting_value, updated_by)
        VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_by = VALUES(updated_by)`,
-      [req.auth!.schoolId, req.params.key, parsed.data.value, req.auth!.userId]
+      [req.auth!.schoolId, settingKey, storedValue, req.auth!.userId]
     );
     res.json({ data: { message: "Setting updated." } });
   } catch (error) { next(error); }
