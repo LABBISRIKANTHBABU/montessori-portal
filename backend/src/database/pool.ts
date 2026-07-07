@@ -9,7 +9,7 @@ export function getPool(): Pool {
     host: config.DB_HOST, port: config.DB_PORT, user: config.DB_USER, password: config.DB_PASSWORD,
     database: config.DB_NAME, connectionLimit: config.DB_CONNECTION_LIMIT, waitForConnections: true,
     queueLimit: 0, enableKeepAlive: true, keepAliveInitialDelay: 10_000, charset: "utf8mb4",
-    timezone: "Z", dateStrings: true, ssl: config.DB_SSL ? { rejectUnauthorized: true } : undefined
+    timezone: "Z", dateStrings: true, ssl: config.DB_SSL ? { rejectUnauthorized: false } : undefined
   });
   return pool;
 }

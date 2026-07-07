@@ -198,8 +198,8 @@ app.get("/api/health", async (_req, res) => {
       status: "degraded",
       mode: "database",
       checks: { app: true, database: false },
-      database: { ok: false },
-      message: "API is running, but the database connection is not healthy.",
+      database: { ok: false, error: typedError.message, code: typedError.code },
+      message: typedError.message,
       timestamp: new Date().toISOString(),
     });
   }
