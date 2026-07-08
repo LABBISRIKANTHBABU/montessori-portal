@@ -6,6 +6,7 @@ export type Student = {
   fullName: string;
   className: string;
   sectionName: string;
+  academicYear?: string;
   gender: string;
   status: string;
   guardianPhone?: string;
@@ -130,7 +131,20 @@ export const api = {
   groupOverview: () => request<{ data: GroupOverview }>("/admin/overview"),
   accessModel: () => request<{ data: { role: string; scope: "all_schools" | "assigned_school"; homeSchoolId: number; activeSchoolId: number; permissions: string[] } }>("/access-model"),
   logout: () => request<{message:string}>("/auth/logout",{method:"POST"}),
-  students: (query = "", status = "", page = 1) => request<{ data: Student[]; total: number; page: number; limit: number }>(`/students?search=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}&page=${page}`),
+  students: (query = "", status = "", page = 1, options: { limit?: number; academicYear?: string; className?: string; sectionName?: string; sortBy?: string; sortDir?: "asc" | "desc" } = {}) => {
+    const params = new URLSearchParams({
+      search: query,
+      status,
+      page: String(page),
+      limit: String(options.limit || 25),
+    });
+    if (options.academicYear) params.set("academicYear", options.academicYear);
+    if (options.className) params.set("className", options.className);
+    if (options.sectionName) params.set("sectionName", options.sectionName);
+    if (options.sortBy) params.set("sortBy", options.sortBy);
+    if (options.sortDir) params.set("sortDir", options.sortDir);
+    return request<{ data: Student[]; total: number; page: number; limit: number }>(`/students?${params.toString()}`);
+  },
   academicSetup: () => request<{ data: { academicYears: string[]; boards: string[]; classes: string[] } }>("/academic/setup"),
   createStudent: (payload: FormData) =>
     request<{ data: Student }>("/students", { method: "POST", body: payload }),
@@ -156,7 +170,7 @@ export const api = {
   checkDuplicate: (admissionNo: string, excludeId?: number) => request<{duplicate: boolean; existing: any}>(`/students/check-duplicate?admissionNo=${encodeURIComponent(admissionNo)}${excludeId ? `&excludeId=${excludeId}` : ""}`),
   imports:()=>request<{data:any[]}>("/imports"),
   importBatch:(id:string)=>request<{data:any}>(`/imports/${id}`),
-  uploadImport:(file:File)=>{const form=new FormData();form.append("file",file);return request<{data:any}>("/imports/upload",{method:"POST",body:form});},
+  uploadImport:(file:File,mapping?:Record<string,string>)=>{const form=new FormData();form.append("file",file);if(mapping)form.append("mapping",JSON.stringify(mapping));return request<{data:any}>("/imports/upload",{method:"POST",body:form});},
   stageLegacy:()=>request<{data:any}>("/imports/legacy/stage",{method:"POST"}),
   approveImport:(id:string)=>request<{data:any}>(`/imports/${id}/approve`,{method:"POST"}),
   rejectImport:(id:string)=>request<{data:any}>(`/imports/${id}/reject`,{method:"POST"}),

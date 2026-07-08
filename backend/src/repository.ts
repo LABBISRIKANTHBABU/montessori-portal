@@ -154,8 +154,8 @@ export async function getGroupOverview() {
 
 // ─── Students ────────────────────────────────────────────────────────────
 
-export async function listStudents(schoolId: number, search: string, status: string, limit: number, offset: number) {
-  const result = await listProductionStudents(schoolId, search, status, limit, offset);
+export async function listStudents(schoolId: number, search: string, status: string, limit: number, offset: number, filters: Parameters<typeof listProductionStudents>[5] = {}) {
+  const result = await listProductionStudents(schoolId, search, status, limit, offset, filters);
   return { data: result.data, total: result.total };
 }
 
@@ -239,9 +239,9 @@ export async function getImportBatch(schoolId: number, batchId: string) {
   return getBatch(schoolId, batchId);
 }
 
-export async function createImportBatch(schoolId: number, payload: { context: { schoolId: number; userId: number }; sourceType: "excel" | "csv" | "legacy"; filename: string; rows: any[] }) {
+export async function createImportBatch(schoolId: number, payload: { context: { schoolId: number; userId: number }; sourceType: "excel" | "csv" | "legacy"; filename: string; rows: any[]; mapping?: Record<string, string> }) {
   const { stageBatch } = await import("./modules/imports/importService.js");
-  return stageBatch(payload.context, payload.sourceType, payload.filename, payload.rows);
+  return stageBatch(payload.context, payload.sourceType, payload.filename, payload.rows, payload.mapping);
 }
 
 export async function approveImport(schoolId: number, userId: number, batchId: string) {

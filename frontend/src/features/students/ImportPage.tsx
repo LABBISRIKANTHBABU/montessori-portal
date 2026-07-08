@@ -49,15 +49,24 @@ const CANONICAL_FIELDS = [
 ];
 
 const ALIASES: Record<string, string> = {
-  idno: "admissionNo", admissionno: "admissionNo", nameofthepupil: "fullName", name: "fullName",
-  studentaadhaarno: "studentAadhaarNo", penno: "penNo", aaparid: "apaarId",
-  fathername: "fatherName", fatheraadhaarno: "fatherAadhaarNo", fathermobilenumber: "fatherMobileNumber",
-  mailid: "studentEmail", mothername: "motherName", motheraadharno: "motherAadhaarNo",
-  mothermobileno: "motherMobileNumber", motherbankaccountno: "motherBankAccountNo", bankifsccode: "bankIfscCode",
+  idno: "idNo", idnumber: "idNo",
+  admissionno: "admissionNo", admissionnumber: "admissionNo", admno: "admissionNo", admission: "admissionNo",
+  nameofthepupil: "fullName", studentname: "fullName", fullname: "fullName", pupilename: "fullName", name: "fullName",
+  dateofbirth: "dateOfBirth", dob: "dateOfBirth", birthdate: "dateOfBirth",
+  dateofadmission: "dateOfAdmission", admissiondate: "dateOfAdmission",
+  class: "classAdmitted", grade: "classAdmitted",
+  studentaadhaarno: "studentAadhaarNo", studentaadharno: "studentAadhaarNo", aadhaar: "studentAadhaarNo", aadhar: "studentAadhaarNo", aadhaarno: "studentAadhaarNo",
+  penno: "penNo", pen: "penNo", aaparid: "apaarId", apaarid: "apaarId", apaar: "apaarId",
+  fathername: "fatherName", fatheraadhaarno: "fatherAadhaarNo", fatheraadharno: "fatherAadhaarNo", fathermobilenumber: "fatherMobileNumber", fathermobile: "fatherMobileNumber", fatherphone: "fatherMobileNumber",
+  fathermailid: "fatherEmail", fatheremail: "fatherEmail",
+  mailid: "studentEmail", email: "studentEmail", studentemail: "studentEmail",
+  mothername: "motherName", motheraadhaarno: "motherAadhaarNo", motheraadharno: "motherAadhaarNo",
+  mothermobileno: "motherMobileNumber", mothermobile: "motherMobileNumber", motherphone: "motherMobileNumber",
+  motherbankaccountno: "motherBankAccountNo", bankifsccode: "bankIfscCode", ifsccode: "bankIfscCode",
   residenceaddress: "residenceAddress", fatherqualification: "fatherQualification", fatheroccupation: "fatherOccupation",
-  fathermailid: "fatherEmail", motherqualification: "motherQualification", motheroccupation: "motherOccupation",
+  motherqualification: "motherQualification", motheroccupation: "motherOccupation",
   mothermailid: "motherEmail", previousschoolclass: "previousSchoolClass", tcnumber: "previousTcNo",
-  dateofadmission: "dateOfAdmission", dateofbirth: "dateOfBirth", nationality: "nationality",
+  nationality: "nationality",
   religion: "religion", caste: "caste", subcaste: "subCaste", mothertongue: "motherTongue",
   classadmitted: "classAdmitted", classleaving: "classLeaving", dateofleaving: "dateOfLeaving",
   leavingtcno: "leavingTcNo", tctakendate: "tcTakenDate", academicyear: "academicYear",
@@ -140,7 +149,22 @@ export default function ImportPage() {
     if (!rawFile) return;
     setBusy(true); setError("");
     try {
-      const r = await api.uploadImport(rawFile);
+      const required = CANONICAL_FIELDS.filter(field => field.required);
+      const mappedFields = Object.values(headerMapping).filter(Boolean);
+      const missing = required.filter(field => !mappedFields.includes(field.key));
+      if (missing.length) {
+        setError(`Required columns are not mapped: ${missing.map(field => field.label).join(", ")}.`);
+        setBusy(false);
+        return;
+      }
+      const duplicates = mappedFields.filter((field, index) => mappedFields.indexOf(field) !== index);
+      if (duplicates.length) {
+        const labels = [...new Set(duplicates)].map(key => CANONICAL_FIELDS.find(field => field.key === key)?.label || key);
+        setError(`One student field is mapped more than once: ${labels.join(", ")}.`);
+        setBusy(false);
+        return;
+      }
+      const r = await api.uploadImport(rawFile, headerMapping);
       setSelected(r.data);
       setStep("preview");
       await loadBatches();

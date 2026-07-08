@@ -11,6 +11,7 @@ export type ProductionStudentInput = {
   fatherName?: string; fatherAadhaarNo?: string; fatherMobileNumber?: string; fatherEmail?: string;
   fatherQualification?: string; fatherOccupation?: string; motherName?: string; motherAadhaarNo?: string;
   motherMobileNumber?: string; motherEmail?: string; motherQualification?: string; motherOccupation?: string;
+  guardianName?: string; guardianMobileNumber?: string; guardianEmail?: string; guardianRelation?: string;
   motherBankAccountNo?: string; bankIfscCode?: string; studentEmail?: string; residenceAddress: string;
   currentStatus?: "active" | "inactive" | "dropped" | "transferred" | "alumni";
   classLeaving?: string; dateOfLeaving?: string; leavingTcNo?: string; tcTakenDate?: string;
@@ -53,7 +54,8 @@ export async function createProductionStudent(input: ProductionStudentInput, con
     }
     const guardians = [
       input.fatherName && { relation: "father", name: input.fatherName, mobile: input.fatherMobileNumber, email: input.fatherEmail, aadhaar: input.fatherAadhaarNo, qualification: input.fatherQualification, occupation: input.fatherOccupation },
-      input.motherName && { relation: "mother", name: input.motherName, mobile: input.motherMobileNumber, email: input.motherEmail, aadhaar: input.motherAadhaarNo, qualification: input.motherQualification, occupation: input.motherOccupation, bank: input.motherBankAccountNo, ifsc: input.bankIfscCode }
+      input.motherName && { relation: "mother", name: input.motherName, mobile: input.motherMobileNumber, email: input.motherEmail, aadhaar: input.motherAadhaarNo, qualification: input.motherQualification, occupation: input.motherOccupation, bank: input.motherBankAccountNo, ifsc: input.bankIfscCode },
+      input.guardianName && { relation: "guardian", name: input.guardianName, mobile: input.guardianMobileNumber, email: input.guardianEmail, occupation: input.guardianRelation }
     ].filter(Boolean) as Array<Record<string, string | undefined>>;
     for (const guardian of guardians) {
       const [guardianResult] = await connection.query<ResultSetHeader>(
@@ -96,7 +98,15 @@ export async function createProductionStudent(input: ProductionStudentInput, con
   });
 }
 
-export async function listProductionStudents(schoolId: number, search: string, status?: string, limit = 50, offset = 0) {
+export type StudentListFilters = {
+  academicYear?: string;
+  className?: string;
+  sectionName?: string;
+  sortBy?: "name" | "admissionNo" | "className" | "status" | "createdAt";
+  sortDir?: "asc" | "desc";
+};
+
+export async function listProductionStudents(schoolId: number, search: string, status?: string, limit = 50, offset = 0, filters: StudentListFilters = {}) {
   const term = `%${search.replace(/[\\%_]/g, "\\$&")}%`;
   const conditions = ["s.school_id = ?", "s.deleted_at IS NULL"];
   const params: Array<string | number> = [schoolId];
@@ -108,10 +118,35 @@ export async function listProductionStudents(schoolId: number, search: string, s
     conditions.push("s.current_status = ?");
     params.push(status);
   }
+  if (filters.academicYear) {
+    conditions.push("y.name = ?");
+    params.push(filters.academicYear);
+  }
+  if (filters.className) {
+    conditions.push("a.class_admitted = ?");
+    params.push(filters.className);
+  }
+  if (filters.sectionName) {
+    conditions.push("a.section_name = ?");
+    params.push(filters.sectionName);
+  }
   const where = conditions.join(" AND ");
+  const sortColumns = {
+    name: "s.full_name",
+    admissionNo: "s.admission_no",
+    className: "a.class_admitted",
+    status: "s.current_status",
+    createdAt: "s.created_at",
+  } as const;
+  const sortColumn = sortColumns[filters.sortBy || "name"] || sortColumns.name;
+  const sortDirection = filters.sortDir === "desc" ? "DESC" : "ASC";
   // Get total count
   const [countResult] = await getPool().execute<RowDataPacket[]>(
-    `SELECT COUNT(*) total FROM v2_students s WHERE ${where}`,
+    `SELECT COUNT(*) total
+     FROM v2_students s
+     LEFT JOIN v2_admissions a ON a.student_id = s.id
+     LEFT JOIN v2_academic_years y ON y.id = a.academic_year_id
+     WHERE ${where}`,
     params
   );
   const total = Number(countResult[0]?.total || 0);
@@ -119,6 +154,7 @@ export async function listProductionStudents(schoolId: number, search: string, s
   params.push(limit, offset);
   const [rows] = await getPool().execute<RowDataPacket[]>(
     `SELECT s.id, s.student_uid studentUid, s.admission_no admissionNo, s.full_name fullName,
+            COALESCE(y.name, '') academicYear,
             COALESCE(a.class_admitted, '—') className, COALESCE(a.section_name, '—') sectionName,
             COALESCE(s.gender, 'other') gender, s.current_status status,
             (SELECT g.mobile
@@ -129,8 +165,9 @@ export async function listProductionStudents(schoolId: number, search: string, s
              LIMIT 1) guardianPhone
      FROM v2_students s
      LEFT JOIN v2_admissions a ON a.student_id = s.id
+     LEFT JOIN v2_academic_years y ON y.id = a.academic_year_id
      WHERE ${where}
-     ORDER BY s.full_name LIMIT ? OFFSET ?`,
+     ORDER BY ${sortColumn} ${sortDirection}, s.id ASC LIMIT ? OFFSET ?`,
     params
   );
   return { data: rows, total };

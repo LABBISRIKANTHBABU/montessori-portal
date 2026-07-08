@@ -331,10 +331,19 @@ app.get("/api/students", authenticate, requirePermission("student.view"), async 
   const search = String(req.query.search || "").trim().toLowerCase();
   const status = String(req.query.status || "").trim();
   const page = Math.max(1, Number(req.query.page) || 1);
-  const limit = 50;
+  const limit = Math.min(100, Math.max(10, Number(req.query.limit) || 25));
   const offset = (page - 1) * limit;
+  const sortBy = String(req.query.sortBy || "name");
+  const sortDir: "asc" | "desc" = String(req.query.sortDir || "asc").toLowerCase() === "desc" ? "desc" : "asc";
+  const filters = {
+    academicYear: String(req.query.academicYear || "").trim() || undefined,
+    className: String(req.query.class || req.query.className || "").trim() || undefined,
+    sectionName: String(req.query.section || req.query.sectionName || "").trim() || undefined,
+    sortBy: ["name", "admissionNo", "className", "status", "createdAt"].includes(sortBy) ? sortBy as "name" | "admissionNo" | "className" | "status" | "createdAt" : "name",
+    sortDir,
+  };
   try {
-    const result = await repo.listStudents(req.auth!.schoolId, search, status, limit, offset);
+    const result = await repo.listStudents(req.auth!.schoolId, search, status, limit, offset, filters);
     res.json({ data: result.data, total: result.total, page, limit });
   } catch (error) { next(error); }
 });
@@ -386,6 +395,10 @@ const studentSchema = z.object({
   motherEmail: optionalEmail,
   motherQualification: optionalText(150),
   motherOccupation: optionalText(150),
+  guardianName: optionalText(200),
+  guardianMobileNumber: optionalMobile,
+  guardianEmail: optionalEmail,
+  guardianRelation: optionalText(150),
   motherBankAccountNo: optionalText(30),
   bankIfscCode: z.preprocess(value => value === "" ? undefined : value, z.string().trim().toUpperCase().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, "Enter a valid IFSC code.").optional()),
   studentEmail: optionalEmail,
@@ -610,15 +623,27 @@ app.get("/api/imports/:id", authenticate, requirePermission("import.view"), asyn
 app.post("/api/imports/upload", authenticate, requirePermission("import.upload"), importUpload.single("file"), async (req: AuthRequest, res, next) => {
   if (!req.file) return res.status(422).json({ message: "Select a spreadsheet to upload." });
   try {
-    const parsed = await parseStudentWorkbook(req.file.buffer, req.file.originalname);
+    let mapping: Record<string, string> | undefined;
+    if (req.body.mapping) {
+      try { mapping = JSON.parse(String(req.body.mapping)) as Record<string, string>; }
+      catch { return res.status(422).json({ message: "Column mapping must be valid JSON." }); }
+    }
+    const parsed = await parseStudentWorkbook(req.file.buffer, req.file.originalname, mapping);
     const existing = await repo.getExistingAdmissionNumbers(req.auth!.schoolId);
-    const rows = validateRows(parsed, existing);
+    const { existingAcademicYears } = await import("./modules/imports/importService.js");
+    const academicYears = await existingAcademicYears(req.auth!.schoolId);
+    const rows = validateRows(parsed.rows, {
+      existingAdmissions: existing,
+      academicYears,
+      schoolExists: Boolean(await repo.getSchoolById(req.auth!.schoolId)),
+    });
     const sourceType: "excel" | "csv" = req.file.originalname.toLowerCase().endsWith(".csv") ? "csv" : "excel";
     const batch = await repo.createImportBatch(req.auth!.schoolId, {
       context: req.auth! as { schoolId: number; userId: number },
       sourceType,
       filename: req.file.originalname,
-      rows
+      rows,
+      mapping: parsed.mapping,
     });
     res.status(201).json({ data: batch });
   } catch (error) { next(error); }

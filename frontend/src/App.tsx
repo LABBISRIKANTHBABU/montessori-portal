@@ -208,6 +208,62 @@ function ApiConnectionStatus({ compact = false }: { compact?: boolean }) {
   );
 }
 
+function AuthLayout({
+  eyebrow,
+  title,
+  subtitle,
+  roleBadge,
+  backLabel,
+  onBack,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  roleBadge: string;
+  backLabel: string;
+  onBack: () => void;
+  children: ReactNode;
+}) {
+  const supportedRoles = ["Super Admin", "School Admin", "Teacher", "Accountant", "Reception"];
+  return (
+    <main className="login-page auth-layout">
+      <button className="back-link auth-back-link" onClick={onBack}>
+        <ArrowRight size={15} /> {backLabel}
+      </button>
+
+      <section className="auth-hero">
+        <div className="auth-hero-card">
+          <Brand light />
+          <span className="auth-role-badge"><Shield size={15} /> {roleBadge}</span>
+          <div>
+            <span className="eyebrow light">{eyebrow}</span>
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
+          </div>
+          <div className="auth-role-strip" aria-label="Supported portal roles">
+            {supportedRoles.map(role => <span key={role}>{role}</span>)}
+          </div>
+          <blockquote>
+            "The education of even a small child does not aim at preparing him for school, but for life."
+            <cite>— Maria Montessori</cite>
+          </blockquote>
+        </div>
+      </section>
+
+      <section className="auth-panel">
+        <div className="auth-panel-inner">
+          {children}
+          <footer className="auth-footer">
+            <span>Montessori Group ERP</span>
+            <span>Secure school operations portal</span>
+          </footer>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 function Landing() {
   const navigate = useNavigate();
   const [schools, setSchools] = useState<School[]>([]);
@@ -307,28 +363,25 @@ function Login({ onLogin, isSuperAdmin }: { onLogin: (session: NonNullable<Sessi
     } finally { setLoading(false); }
   }
 
+  const loginTitle = isSuperAdmin ? "Platform Administration" : targetSchool?.name || "School Portal";
+  const loginSubtitle = isSuperAdmin
+    ? "Group-wide access for campus governance, approvals, reports, users and operations."
+    : `${targetSchool?.city || "Campus"} portal for school admin, teachers, accounts and reception teams.`;
+
   return (
-    <main className="login-page">
-      <button className="back-link" onClick={() => navigate("/")}>
-        <ArrowRight size={15} /> Back to schools
-      </button>
-      <section className="login-intro">
-        <Brand light />
-        <div>
-          <span className="eyebrow light">{isSuperAdmin ? "GLOBAL PLATFORM" : "SECURE ACCESS"}</span>
-          <h1>{isSuperAdmin ? "Platform Administration" : targetSchool?.name || "School Portal"}</h1>
-          <p>{isSuperAdmin
-            ? "Group-wide metrics, campus management, and platform oversight."
-            : `${targetSchool?.city || ""} — Sign in with your staff credentials.`
-          }</p>
-        </div>
-        <blockquote>"The education of even a small child does not aim at preparing him for school, but for life."<cite>— Maria Montessori</cite></blockquote>
-      </section>
+    <AuthLayout
+      eyebrow={isSuperAdmin ? "GLOBAL PLATFORM ACCESS" : "SECURE CAMPUS ACCESS"}
+      title={loginTitle}
+      subtitle={loginSubtitle}
+      roleBadge={isSuperAdmin ? "Super Admin" : "School Workspace"}
+      backLabel="Back to schools"
+      onBack={() => navigate("/")}
+    >
       <section className="login-panel">
-        <form onSubmit={submit}>
+        <form className="auth-form" onSubmit={submit}>
           <span className="step-label">{isSuperAdmin ? "SUPER ADMIN ACCESS" : "STAFF LOGIN"}</span>
-          <h2>{isSuperAdmin ? "Platform Admin" : "Sign in"}</h2>
-          <p className="muted">Enter your credentials to access the portal.</p>
+          <h2>{isSuperAdmin ? "Sign in to command centre" : "Sign in to your school"}</h2>
+          <p className="muted">Use your official staff credentials. Sessions are protected and school-scoped.</p>
           <ApiConnectionStatus compact />
           <label>
             Email address
@@ -340,18 +393,18 @@ function Login({ onLogin, isSuperAdmin }: { onLogin: (session: NonNullable<Sessi
           </label>
           <button
             type="button"
-            className="text-button"
+            className="text-button auth-forgot-link"
             onClick={() => navigate(`/forgot-password?schoolId=${schoolId}&email=${encodeURIComponent(email)}`)}
           >
             Forgot password?
           </button>
           {error && <div className="form-error">{error}</div>}
-          <button className="primary-button wide" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"} <ArrowRight size={18} />
+          <button className="primary-button wide auth-submit" disabled={loading}>
+            {loading ? "Signing in..." : "Sign in securely"} <ArrowRight size={18} />
           </button>
         </form>
       </section>
-    </main>
+    </AuthLayout>
   );
 }
 
@@ -389,20 +442,16 @@ function PasswordRecovery({ mode }: { mode: "request" | "reset" }) {
   }
 
   return (
-    <main className="login-page">
-      <button className="back-link" onClick={() => navigate(schoolId ? `/login/${schoolId}` : "/super-admin")}>
-        <ArrowRight size={15} /> Back to sign in
-      </button>
-      <section className="login-intro">
-        <Brand light />
-        <div>
-          <span className="eyebrow light">SECURE ACCOUNT RECOVERY</span>
-          <h1>{mode === "request" ? "Reset your password" : "Choose a new password"}</h1>
-          <p>Recovery links are single-use and expire after 30 minutes.</p>
-        </div>
-      </section>
+    <AuthLayout
+      eyebrow="SECURE ACCOUNT RECOVERY"
+      title={mode === "request" ? "Reset your password" : "Choose a new password"}
+      subtitle="Recovery links are single-use and expire after 30 minutes."
+      roleBadge="Account Recovery"
+      backLabel="Back to sign in"
+      onBack={() => navigate(schoolId ? `/login/${schoolId}` : "/super-admin")}
+    >
       <section className="login-panel">
-        <form onSubmit={submit}>
+        <form className="auth-form" onSubmit={submit}>
           <span className="step-label">PASSWORD RECOVERY</span>
           <h2>{mode === "request" ? "Find your account" : "Create new password"}</h2>
           {mode === "request" ? (
@@ -420,7 +469,7 @@ function PasswordRecovery({ mode }: { mode: "request" | "reset" }) {
           </button>
         </form>
       </section>
-    </main>
+    </AuthLayout>
   );
 }
 

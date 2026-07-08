@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Upload, ArrowRight, Download, Filter, MoreHorizontal, GraduationCap, Users, Trash2 } from "lucide-react";
+import { Plus, Search, Upload, ArrowRight, Download, Filter, MoreHorizontal, Users, ArrowUpDown } from "lucide-react";
 import { api, Student } from "../../api";
 import { useDebounce } from "../../hooks/useDebounce";
 import Pagination from "../../components/Pagination";
@@ -13,6 +13,12 @@ export default function StudentsPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
   const [statusFilter, setStatusFilter] = useState("active");
+  const [academicYear, setAcademicYear] = useState("");
+  const [classFilter, setClassFilter] = useState("");
+  const [sectionFilter, setSectionFilter] = useState("");
+  const [sortBy, setSortBy] = useState("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [academics, setAcademics] = useState<{ academicYears: string[]; classes: string[] }>({ academicYears: [], classes: [] });
   const [page, setPage] = useState(1);
   const pageSize = 25;
   const [loading, setLoading] = useState(false);
@@ -21,14 +27,27 @@ export default function StudentsPage() {
   const [bulkValue, setBulkValue] = useState("");
   const [bulkLoading, setBulkLoading] = useState(false);
 
-  useEffect(() => { setPage(1); }, [statusFilter]);
+  useEffect(() => { api.academicSetup().then(result => setAcademics({ academicYears: result.data.academicYears, classes: result.data.classes })).catch(() => undefined); }, []);
+  useEffect(() => { setPage(1); }, [statusFilter, academicYear, classFilter, sectionFilter, sortBy, sortDir, debouncedSearch]);
 
   const load = () => {
     setLoading(true);
-    api.students(debouncedSearch, statusFilter, page).then(r => { setStudents(r.data); setTotal(r.total); }).catch(() => { setStudents([]); setTotal(0); }).finally(() => setLoading(false));
+    api.students(debouncedSearch, statusFilter, page, {
+      limit: pageSize,
+      academicYear,
+      className: classFilter,
+      sectionName: sectionFilter,
+      sortBy,
+      sortDir,
+    }).then(r => { setStudents(r.data); setTotal(r.total); }).catch(() => { setStudents([]); setTotal(0); }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { void load(); }, [debouncedSearch, statusFilter, page]);
+  useEffect(() => { void load(); }, [debouncedSearch, statusFilter, academicYear, classFilter, sectionFilter, sortBy, sortDir, page]);
+
+  function toggleSort(field: string) {
+    if (sortBy === field) setSortDir(prev => prev === "asc" ? "desc" : "asc");
+    else { setSortBy(field); setSortDir("asc"); }
+  }
 
   const toggleSelectAll = useCallback(() => {
     if (selectedIds.length === students.length) setSelectedIds([]);
@@ -120,6 +139,19 @@ export default function StudentsPage() {
               </select>
             </div>
             <button className="icon-button" title="More filters"><Filter size={18} /></button>
+            <div className="select-wrap small">
+              <select value={academicYear} onChange={e => setAcademicYear(e.target.value)}>
+                <option value="">All years</option>
+                {academics.academicYears.map(year => <option key={year} value={year}>{year}</option>)}
+              </select>
+            </div>
+            <div className="select-wrap small">
+              <select value={classFilter} onChange={e => setClassFilter(e.target.value)}>
+                <option value="">All classes</option>
+                {academics.classes.map(className => <option key={className} value={className}>{className}</option>)}
+              </select>
+            </div>
+            <input className="section-filter-input" value={sectionFilter} onChange={e => setSectionFilter(e.target.value)} placeholder="Section" />
             <div className="dropdown-wrap">
               <button className="icon-button" title="Export" onClick={() => handleExport("csv")}><Download size={18} /></button>
             </div>
@@ -155,20 +187,21 @@ export default function StudentsPage() {
             <thead>
               <tr>
                 <th><input type="checkbox" checked={students.length > 0 && selectedIds.length === students.length} onChange={toggleSelectAll} /></th>
-                <th>Student</th>
-                <th>Admission no.</th>
-                <th>Class</th>
+                <th><button className="table-sort-button" onClick={() => toggleSort("name")}>Student <ArrowUpDown size={13} /></button></th>
+                <th><button className="table-sort-button" onClick={() => toggleSort("admissionNo")}>Admission no. <ArrowUpDown size={13} /></button></th>
+                <th><button className="table-sort-button" onClick={() => toggleSort("className")}>Class <ArrowUpDown size={13} /></button></th>
                 <th>Section</th>
+                <th>Year</th>
                 <th>Parent phone</th>
-                <th>Status</th>
+                <th><button className="table-sort-button" onClick={() => toggleSort("status")}>Status <ArrowUpDown size={13} /></button></th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} style={{textAlign: "center", padding: "2rem"}}>Loading directory...</td></tr>
+                <tr><td colSpan={9} style={{textAlign: "center", padding: "2rem"}}>Loading directory...</td></tr>
               ) : students.length === 0 ? (
-                <tr><td colSpan={8}><EmptyState icon={<Users size={40} />} title="No students found" description="Try adjusting your search or filters" /></td></tr>
+                <tr><td colSpan={9}><EmptyState icon={<Users size={40} />} title="No students found" description="Try adjusting your search or filters" /></td></tr>
               ) : (
                 students.map(student => <StudentRow key={student.id} student={student} selected={selectedIds.includes(student.id)} onToggle={() => toggleSelect(student.id)} onNavigate={navigate} />)
               )}
@@ -197,6 +230,7 @@ const StudentRow = memo(function StudentRow({ student, selected, onToggle, onNav
       <td>{student.admissionNo}</td>
       <td>{student.className}</td>
       <td>{student.sectionName}</td>
+      <td>{student.academicYear || "—"}</td>
       <td>{student.guardianPhone || "—"}</td>
       <td><span className={`status-badge ${student.status}`}>{student.status}</span></td>
       <td className="actions-cell">
