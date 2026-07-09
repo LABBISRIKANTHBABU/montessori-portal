@@ -13,7 +13,7 @@ const CANONICAL_FIELDS = [
   { key: "dateOfBirth", label: "Date of Birth", required: true },
   { key: "dateOfAdmission", label: "Date of Admission", required: true },
   { key: "academicYear", label: "Academic Year", required: true },
-  { key: "board", label: "Board", required: true },
+  { key: "board", label: "Board", defaultable: true },
   { key: "classAdmitted", label: "Class Admitted", required: true },
   { key: "sectionName", label: "Section" },
   { key: "residenceAddress", label: "Residence Address", required: true },
@@ -93,10 +93,22 @@ export default function ImportPage() {
   const [rawFile, setRawFile] = useState<File | null>(null);
   const [rawHeaders, setRawHeaders] = useState<string[]>([]);
   const [headerMapping, setHeaderMapping] = useState<Record<string, string>>({});
+  const [defaultValues, setDefaultValues] = useState<Record<string, string>>({ board: "STATE" });
+  const [boards, setBoards] = useState<string[]>(["STATE", "CBSE", "ICSE"]);
   const [showHistory, setShowHistory] = useState(false);
 
   const loadBatches = () => api.imports().then(r => setBatches(r.data)).catch(() => {});
   useEffect(() => { void loadBatches(); }, []);
+  useEffect(() => {
+    api.academicSetup().then(result => {
+      const availableBoards = result.data.boards.length ? result.data.boards : ["STATE", "CBSE", "ICSE"];
+      setBoards(availableBoards);
+      setDefaultValues(prev => ({
+        ...prev,
+        board: prev.board && availableBoards.includes(prev.board) ? prev.board : (availableBoards.includes("STATE") ? "STATE" : availableBoards[0] || "STATE"),
+      }));
+    }).catch(() => undefined);
+  }, []);
 
   function detectHeaders(file: File) {
     return new Promise<string[]>((resolve) => {
@@ -152,8 +164,14 @@ export default function ImportPage() {
       const required = CANONICAL_FIELDS.filter(field => field.required);
       const mappedFields = Object.values(headerMapping).filter(Boolean);
       const missing = required.filter(field => !mappedFields.includes(field.key));
+      const missingDefaultable = CANONICAL_FIELDS.filter(field => field.defaultable && !mappedFields.includes(field.key) && !defaultValues[field.key]);
       if (missing.length) {
         setError(`Required columns are not mapped: ${missing.map(field => field.label).join(", ")}.`);
+        setBusy(false);
+        return;
+      }
+      if (missingDefaultable.length) {
+        setError(`Provide default values for: ${missingDefaultable.map(field => field.label).join(", ")}.`);
         setBusy(false);
         return;
       }
@@ -164,7 +182,7 @@ export default function ImportPage() {
         setBusy(false);
         return;
       }
-      const r = await api.uploadImport(rawFile, headerMapping);
+      const r = await api.uploadImport(rawFile, headerMapping, defaultValues);
       setSelected(r.data);
       setStep("preview");
       await loadBatches();
@@ -255,6 +273,7 @@ export default function ImportPage() {
     setRawFile(null);
     setRawHeaders([]);
     setHeaderMapping({});
+    setDefaultValues(prev => ({ ...prev, board: boards.includes("STATE") ? "STATE" : boards[0] || "STATE" }));
     setError("");
   }
 
@@ -408,14 +427,31 @@ export default function ImportPage() {
                       >
                         <option value="">— Skip this column —</option>
                         {CANONICAL_FIELDS.map(f => (
-                          <option key={f.key} value={f.key}>{f.label}{f.required ? " *" : ""}</option>
+                          <option key={f.key} value={f.key}>{f.label}{f.required ? " *" : f.defaultable ? " (default allowed)" : ""}</option>
                         ))}
                       </select>
-                      <span className="required-indicator">{canonical?.required ? "Required" : "Optional"}</span>
+                      <span className="required-indicator">{canonical?.required ? "Required" : canonical?.defaultable ? "Default allowed" : "Optional"}</span>
                     </div>
                   );
                 })}
               </div>
+              {!Object.values(headerMapping).includes("board") && (
+                <div className="form-grid" style={{ marginTop: 18, background: "var(--cream)", padding: 16, borderRadius: 12 }}>
+                  <div className="wide">
+                    <span className="step-label">DEFAULT VALUES</span>
+                    <h4 style={{ margin: "4px 0 6px" }}>Board column not found</h4>
+                    <p className="muted" style={{ margin: 0 }}>
+                      This spreadsheet does not need to be edited. Choose the board once and every valid row will inherit it during staging.
+                    </p>
+                  </div>
+                  <label>
+                    Board default
+                    <select value={defaultValues.board || ""} onChange={event => setDefaultValues(prev => ({ ...prev, board: event.target.value }))}>
+                      {boards.map(board => <option key={board} value={board}>{board}</option>)}
+                    </select>
+                  </label>
+                </div>
+              )}
               <div className="wizard-footer">
                 <button className="secondary-button" onClick={() => setStep("upload")}><ArrowLeft size={17} /> Back</button>
                 <button className="primary-button" onClick={handleValidateAndStage} disabled={busy}>

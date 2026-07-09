@@ -84,3 +84,31 @@ test("frontend-visible schools are limited to the approved campus order", async 
   assert.equal(isFrontendVisibleSchoolCode("SSKH"), false);
   assert.equal(isFrontendVisibleSchoolCode("MIH"), false);
 });
+
+test("student import can validate missing Board from a default value", async () => {
+  const { validateRows } = await import("../src/modules/imports/importService.js");
+  const rows = validateRows([
+    {
+      rowNumber: 2,
+      raw: {
+        admissionNo: "IMP-001",
+        fullName: "Import Student",
+        academicYear: "2024",
+        dateOfAdmission: "01-06-2024",
+        dateOfBirth: "01-01-2018",
+        classAdmitted: "I",
+        residenceAddress: "Kurnool",
+      },
+    },
+  ], {
+    existingAdmissions: new Set(),
+    academicYears: new Set(["2024"]),
+    boards: new Set(["STATE"]),
+    schoolExists: true,
+    defaultValues: { board: "STATE" },
+  });
+
+  assert.equal(rows[0]?.status, "valid");
+  assert.equal(rows[0]?.normalized.board, "STATE");
+  assert.deepEqual(rows[0]?.errors, []);
+});

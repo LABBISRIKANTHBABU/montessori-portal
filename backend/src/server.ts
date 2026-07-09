@@ -624,18 +624,30 @@ app.post("/api/imports/upload", authenticate, requirePermission("import.upload")
   if (!req.file) return res.status(422).json({ message: "Select a spreadsheet to upload." });
   try {
     let mapping: Record<string, string> | undefined;
+    let defaultValues: Record<string, unknown> = {};
     if (req.body.mapping) {
       try { mapping = JSON.parse(String(req.body.mapping)) as Record<string, string>; }
       catch { return res.status(422).json({ message: "Column mapping must be valid JSON." }); }
     }
+    if (req.body.defaultValues) {
+      try { defaultValues = JSON.parse(String(req.body.defaultValues)) as Record<string, unknown>; }
+      catch { return res.status(422).json({ message: "Default values must be valid JSON." }); }
+    }
     const parsed = await parseStudentWorkbook(req.file.buffer, req.file.originalname, mapping);
     const existing = await repo.getExistingAdmissionNumbers(req.auth!.schoolId);
-    const { existingAcademicYears } = await import("./modules/imports/importService.js");
+    const { existingAcademicYears, existingBoards, defaultBoardForSchool } = await import("./modules/imports/importService.js");
     const academicYears = await existingAcademicYears(req.auth!.schoolId);
+    const boards = await existingBoards();
+    defaultValues = {
+      board: defaultValues.board || await defaultBoardForSchool(req.auth!.schoolId),
+      ...defaultValues,
+    };
     const rows = validateRows(parsed.rows, {
       existingAdmissions: existing,
       academicYears,
+      boards,
       schoolExists: Boolean(await repo.getSchoolById(req.auth!.schoolId)),
+      defaultValues,
     });
     const sourceType: "excel" | "csv" = req.file.originalname.toLowerCase().endsWith(".csv") ? "csv" : "excel";
     const batch = await repo.createImportBatch(req.auth!.schoolId, {

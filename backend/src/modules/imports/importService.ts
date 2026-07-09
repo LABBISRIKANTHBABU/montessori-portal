@@ -7,18 +7,20 @@ import { createProductionStudent, ProductionStudentInput } from "../students/stu
 
 type ParsedRow = { rowNumber: number; raw: Record<string, unknown> };
 type ImportMapping = Record<string, string>;
+type ImportDefaultValues = Record<string, unknown>;
 type ValidationContext = {
   existingAdmissions: Set<string>;
   academicYears?: Set<string>;
+  boards?: Set<string>;
   schoolExists?: boolean;
   requiredFields?: readonly (typeof requiredFields[number])[];
+  defaultValues?: ImportDefaultValues;
 };
 
 const requiredFields = [
   "admissionNo",
   "fullName",
   "academicYear",
-  "board",
   "dateOfAdmission",
   "dateOfBirth",
   "classAdmitted",
@@ -170,6 +172,14 @@ const normalizeEmail = (value: unknown) => cleanValue(value)?.toLowerCase();
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
+const normalizeBoardCode = (value: unknown) => {
+  const cleaned = cleanValue(value)?.toUpperCase().replace(/\s+/g, "_");
+  if (!cleaned) return undefined;
+  if (["STATE_BOARD", "STATEBOARD", "SSC"].includes(cleaned)) return "STATE";
+  if (["CENTRAL_BOARD", "CBSE_BOARD"].includes(cleaned)) return "CBSE";
+  return cleaned;
+};
+
 const normalizeGender = (value: unknown) => {
   const cleaned = cleanValue(value)?.toLowerCase();
   if (!cleaned) return undefined;
@@ -202,7 +212,9 @@ function resolveHeaderMapping(rawHeaders: string[], providedMapping?: ImportMapp
   for (const header of rawHeaders) {
     const trimmed = String(header || "").trim();
     if (!trimmed) continue;
-    const mapped = providedMapping?.[trimmed] || aliases[cleanHeader(trimmed)];
+    const mapped = Object.prototype.hasOwnProperty.call(providedMapping || {}, trimmed)
+      ? providedMapping?.[trimmed]
+      : aliases[cleanHeader(trimmed)];
     if (mapped) mapping[trimmed] = mapped;
   }
   return mapping;
@@ -269,7 +281,7 @@ export function validateRows(rows: ParsedRow[], contextOrExisting: ValidationCon
       if (cleaned && !parsed) normalized[`${field}Invalid`] = true;
     }
 
-    normalized.board = cleanValue(raw.board)?.toUpperCase();
+    normalized.board = normalizeBoardCode(raw.board) || normalizeBoardCode(context.defaultValues?.board);
     normalized.gender = normalizeGender(raw.gender);
     normalized.studentEmail = normalizeEmail(raw.studentEmail);
     normalized.fatherEmail = normalizeEmail(raw.fatherEmail);
@@ -323,6 +335,9 @@ export function validateRows(rows: ParsedRow[], contextOrExisting: ValidationCon
     if (normalized.academicYear && context.academicYears && !context.academicYears.has(String(normalized.academicYear))) {
       errors.push(`Academic Year "${normalized.academicYear}" is not configured for this school.`);
     }
+    if (normalized.board && context.boards && !context.boards.has(String(normalized.board))) {
+      errors.push(`Board "${normalized.board}" is not configured.`);
+    }
 
     const admission = String(normalized.admissionNo || "").trim().toLowerCase();
     let duplicateReason = "";
@@ -358,6 +373,28 @@ export async function existingAcademicYears(schoolId: number) {
     [schoolId]
   );
   return new Set(rows.map(row => String(row.name)));
+}
+
+export async function existingBoards() {
+  const [rows] = await getPool().execute<RowDataPacket[]>("SELECT code FROM v2_boards");
+  return new Set(rows.map(row => String(row.code)));
+}
+
+export async function defaultBoardForSchool(schoolId: number) {
+  const [classBoards] = await getPool().execute<RowDataPacket[]>(
+    "SELECT DISTINCT board_code code FROM v2_classes WHERE school_id=? AND board_code IS NOT NULL AND board_code<>''",
+    [schoolId]
+  );
+  const configured = classBoards.map(row => String(row.code).trim().toUpperCase()).filter(Boolean);
+  if (configured.length === 1) return configured[0];
+  if (configured.includes("STATE")) return "STATE";
+  if (configured.includes("CBSE")) return "CBSE";
+  if (configured[0]) return configured[0];
+
+  const boards = await existingBoards();
+  if (boards.has("STATE")) return "STATE";
+  if (boards.has("CBSE")) return "CBSE";
+  return [...boards][0] || "STATE";
 }
 
 export async function stageBatch(

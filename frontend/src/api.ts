@@ -170,7 +170,13 @@ export const api = {
   checkDuplicate: (admissionNo: string, excludeId?: number) => request<{duplicate: boolean; existing: any}>(`/students/check-duplicate?admissionNo=${encodeURIComponent(admissionNo)}${excludeId ? `&excludeId=${excludeId}` : ""}`),
   imports:()=>request<{data:any[]}>("/imports"),
   importBatch:(id:string)=>request<{data:any}>(`/imports/${id}`),
-  uploadImport:(file:File,mapping?:Record<string,string>)=>{const form=new FormData();form.append("file",file);if(mapping)form.append("mapping",JSON.stringify(mapping));return request<{data:any}>("/imports/upload",{method:"POST",body:form});},
+  uploadImport:(file:File,mapping?:Record<string,string>,defaultValues?:Record<string,unknown>)=>{
+    const form=new FormData();
+    form.append("file",file);
+    if(mapping)form.append("mapping",JSON.stringify(mapping));
+    if(defaultValues)form.append("defaultValues",JSON.stringify(defaultValues));
+    return request<{data:any}>("/imports/upload",{method:"POST",body:form});
+  },
   stageLegacy:()=>request<{data:any}>("/imports/legacy/stage",{method:"POST"}),
   approveImport:(id:string)=>request<{data:any}>(`/imports/${id}/approve`,{method:"POST"}),
   rejectImport:(id:string)=>request<{data:any}>(`/imports/${id}/reject`,{method:"POST"}),
