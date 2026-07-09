@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { api, apiConfigurationError, DashboardData, GroupOverview, School, SearchResult, Notification, schoolScope, token } from "./api";
 import { ToastProvider } from "./components/Toast";
+import { filterVisibleGroupOverview, orderVisibleSchools } from "./schools/visibleSchools";
 
 const StudentCreatePage = React.lazy(() => import("./features/students/StudentCreatePage"));
 const StudentsPage = React.lazy(() => import("./features/students/StudentsPage"));
@@ -270,7 +271,7 @@ function Landing() {
   const [search, setSearch] = useState("");
   const [loadError, setLoadError] = useState(apiConfigurationError);
   useEffect(() => {
-    api.schools().then(r => setSchools(r.data))
+    api.schools().then(r => setSchools(orderVisibleSchools(r.data)))
       .catch(reason => setLoadError(reason instanceof Error ? reason.message : "Schools could not be loaded."));
   }, []);
 
@@ -348,7 +349,7 @@ function Login({ onLogin, isSuperAdmin }: { onLogin: (session: NonNullable<Sessi
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  useEffect(() => { api.schools().then(r => setSchools(r.data)).catch(() => undefined); }, []);
+  useEffect(() => { api.schools().then(r => setSchools(orderVisibleSchools(r.data))).catch(() => undefined); }, []);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -523,9 +524,10 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
   useEffect(() => {
     if (!isSuperAdmin) return;
     api.schools().then(({ data }) => {
-      setAvailableSchools(data);
+      const visibleSchools = orderVisibleSchools(data);
+      setAvailableSchools(visibleSchools);
       const savedId = Number(schoolScope.get());
-      const selected = data.find(school => school.id === savedId) || data.find(school => school.id === session.school.id) || data[0];
+      const selected = visibleSchools.find(school => school.id === savedId) || visibleSchools.find(school => school.id === session.school.id) || visibleSchools[0];
       if (selected) {
         schoolScope.set(selected.id);
         setActiveSchool(selected);
@@ -789,7 +791,7 @@ function SuperAdminDashboard({
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     api.groupOverview()
-      .then(result => setData(result.data))
+      .then(result => setData(filterVisibleGroupOverview(result.data)))
       .catch(reason => setError(reason instanceof Error ? reason.message : "Group overview could not be loaded."))
       .finally(() => setLoading(false));
   }, []);
@@ -834,7 +836,7 @@ function SchoolsPage({
   const [data, setData] = useState<GroupOverview | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
-    api.groupOverview().then(result => setData(result.data))
+    api.groupOverview().then(result => setData(filterVisibleGroupOverview(result.data)))
       .catch(reason => setError(reason instanceof Error ? reason.message : "Campuses could not be loaded."));
   }, []);
   return (

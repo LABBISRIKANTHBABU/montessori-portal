@@ -6,6 +6,7 @@
 
 import App from "./App";
 import { api, token } from "./api";
+import { orderVisibleSchools, VISIBLE_SCHOOL_CODES } from "./schools/visibleSchools";
 
 // Compile-time type checks (verified by tsc --noEmit)
 type Assert<T extends true> = T;
@@ -29,3 +30,11 @@ export const apiDashboardExists = typeof api.dashboard === "function";
 export const apiSearchExists = typeof api.search === "function";
 export const tokenSetExists = typeof token.set === "function";
 export const tokenClearExists = typeof token.clear === "function";
+
+export const visibleSchoolCodesLocked = VISIBLE_SCHOOL_CODES.join(",");
+export const visibleSchoolFilteringSmoke = orderVisibleSchools([
+  { id: 9, code: "MIH", name: "Montessori Invictus, Hyderabad", city: "Hyderabad" },
+  { id: 3, code: "MSSSACK", name: "Montessori Senior Secondary School, A-Camp, Kurnool", city: "Kurnool" },
+  { id: 1, code: "MEMHSVNK", name: "Montessori EM High School, Vidya Nagar, Kurnool", city: "Kurnool" },
+  { id: 8, code: "SSKH", name: "Sproutz School, Khanamit, Hyderabad", city: "Hyderabad" },
+]).map(school => school.code).join(",");
