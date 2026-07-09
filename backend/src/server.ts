@@ -635,7 +635,8 @@ app.post("/api/imports/upload", authenticate, requirePermission("import.upload")
     }
     const parsed = await parseStudentWorkbook(req.file.buffer, req.file.originalname, mapping);
     const existing = await repo.getExistingAdmissionNumbers(req.auth!.schoolId);
-    const { existingAcademicYears, existingBoards, defaultBoardForSchool } = await import("./modules/imports/importService.js");
+    const { ensureAcademicYearsForImport, existingAcademicYears, existingBoards, defaultBoardForSchool } = await import("./modules/imports/importService.js");
+    await ensureAcademicYearsForImport(req.auth!.schoolId, parsed.rows);
     const academicYears = await existingAcademicYears(req.auth!.schoolId);
     const boards = await existingBoards();
     defaultValues = {

@@ -172,6 +172,17 @@ const normalizeEmail = (value: unknown) => cleanValue(value)?.toLowerCase();
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
+const isPlausibleAcademicYearName = (value: string) => /^\d{4}(?:\s*[-–—/]\s*(?:\d{2}|\d{4}))?$/.test(value);
+
+function academicYearDates(name: string) {
+  const firstYear = name.match(/\d{4}/)?.[0];
+  const year = firstYear ? Number(firstYear) : new Date().getFullYear();
+  return {
+    start: `${year}-06-01`,
+    end: `${year + 1}-05-31`,
+  };
+}
+
 const normalizeBoardCode = (value: unknown) => {
   const cleaned = cleanValue(value)?.toUpperCase().replace(/\s+/g, "_");
   if (!cleaned) return undefined;
@@ -373,6 +384,22 @@ export async function existingAcademicYears(schoolId: number) {
     [schoolId]
   );
   return new Set(rows.map(row => String(row.name)));
+}
+
+export async function ensureAcademicYearsForImport(schoolId: number, rows: ParsedRow[]) {
+  const names = [...new Set(rows
+    .map(row => cleanValue(row.raw.academicYear))
+    .filter((name): name is string => Boolean(name && name.length <= 20 && isPlausibleAcademicYearName(name)))
+  )];
+  for (const name of names) {
+    const dates = academicYearDates(name);
+    await getPool().execute(
+      `INSERT IGNORE INTO v2_academic_years (school_id, name, start_date, end_date, is_current)
+       VALUES (?, ?, ?, ?, 0)`,
+      [schoolId, name, dates.start, dates.end]
+    );
+  }
+  return names;
 }
 
 export async function existingBoards() {

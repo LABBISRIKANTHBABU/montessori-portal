@@ -112,3 +112,8 @@ test("student import can validate missing Board from a default value", async () 
   assert.equal(rows[0]?.normalized.board, "STATE");
   assert.deepEqual(rows[0]?.errors, []);
 });
+
+test("student import exposes academic year auto-provision helper", async () => {
+  const { ensureAcademicYearsForImport } = await import("../src/modules/imports/importService.js");
+  assert.equal(typeof ensureAcademicYearsForImport, "function");
+});
