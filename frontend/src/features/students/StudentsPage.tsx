@@ -98,11 +98,15 @@ export default function StudentsPage({ selectedAcademicYear = "" }: Props) {
 
   async function handleExport(format: "csv" | "xlsx") {
     try {
-      const blob = await api.exportStudents(search, statusFilter, format);
+      const blob = await api.exportStudents(search, statusFilter, format, {
+        academicYear,
+        className: classFilter,
+        sectionName: sectionFilter,
+      });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `students.${format}`;
+      anchor.download = `students-export-${new Date().toISOString().slice(0, 10)}.${format}`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (error) {
@@ -170,7 +174,7 @@ export default function StudentsPage({ selectedAcademicYear = "" }: Props) {
             </div>
             <input className="section-filter-input" value={sectionFilter} onChange={e => setSectionFilter(e.target.value)} placeholder="Section" />
             <div className="dropdown-wrap">
-              <button className="icon-button" title="Export" onClick={() => handleExport("csv")}><Download size={18} /></button>
+              <button className="icon-button" title="Export students to Excel" onClick={() => handleExport("xlsx")}><Download size={18} /></button>
             </div>
           </div>
         </div>

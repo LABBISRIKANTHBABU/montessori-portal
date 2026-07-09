@@ -250,7 +250,7 @@ export async function restoreProductionStudent(schoolId: number, studentId: numb
   });
 }
 
-export async function exportProductionStudents(schoolId: number, search: string, status?: string) {
+export async function exportProductionStudents(schoolId: number, search: string, status?: string, filters: StudentListFilters = {}) {
   const term = `%${search.replace(/[\\%_]/g, "\\$&")}%`;
   const conditions = ["s.school_id = ?", "s.deleted_at IS NULL"];
   const params: Array<string | number> = [schoolId];
@@ -262,17 +262,58 @@ export async function exportProductionStudents(schoolId: number, search: string,
     conditions.push("s.current_status = ?");
     params.push(status);
   }
+  if (filters.academicYear) {
+    conditions.push("y.name = ?");
+    params.push(filters.academicYear);
+  }
+  if (filters.className) {
+    conditions.push("a.class_admitted = ?");
+    params.push(filters.className);
+  }
+  if (filters.sectionName) {
+    conditions.push("a.section_name = ?");
+    params.push(filters.sectionName);
+  }
   const where = conditions.join(" AND ");
   const [rows] = await getPool().execute<RowDataPacket[]>(
-    `SELECT s.admission_no admissionNo, s.full_name fullName, COALESCE(s.gender,'') gender,
-            s.date_of_birth dateOfBirth, s.current_status status,
-            COALESCE(a.class_admitted,'') className, COALESCE(a.section_name,'') sectionName,
-            a.board_code board, a.admission_date dateOfAdmission,
-            COALESCE(s.student_email,'') studentEmail, COALESCE(s.phone,'') phone
+    `SELECT s.student_uid studentUid, s.admission_no admissionNo, s.full_name fullName,
+            COALESCE(s.gender,'') gender, s.date_of_birth dateOfBirth, s.current_status status,
+            COALESCE(s.nationality,'') nationality, COALESCE(s.mother_tongue,'') motherTongue,
+            COALESCE(s.religion,'') religion, COALESCE(s.caste,'') caste, COALESCE(s.sub_caste,'') subCaste,
+            COALESCE(s.student_email,'') studentEmail, COALESCE(s.photo_path,'') photoPath,
+            COALESCE(y.name, '') academicYear, COALESCE(a.class_admitted,'') className,
+            COALESCE(a.section_name,'') sectionName, COALESCE(a.board_code,'') board,
+            a.admission_date dateOfAdmission, COALESCE(a.previous_school_class,'') previousSchoolClass,
+            COALESCE(a.previous_tc_no,'') previousTcNo,
+            COALESCE(addr.full_address,'') residenceAddress, COALESCE(addr.city,'') city,
+            COALESCE(addr.state,'') state, COALESCE(addr.postal_code,'') postalCode,
+            COALESCE((SELECT si.masked_value FROM v2_student_identifiers si WHERE si.student_id=s.id AND si.identifier_type='aadhaar' LIMIT 1),'') studentAadhaar,
+            COALESCE((SELECT si.identifier_value FROM v2_student_identifiers si WHERE si.student_id=s.id AND si.identifier_type='pen' LIMIT 1),'') penNo,
+            COALESCE((SELECT si.identifier_value FROM v2_student_identifiers si WHERE si.student_id=s.id AND si.identifier_type='apaar' LIMIT 1),'') apaarId,
+            COALESCE((SELECT g.full_name FROM v2_student_guardians sg JOIN v2_guardians g ON g.id=sg.guardian_id WHERE sg.student_id=s.id AND g.relation_type='father' LIMIT 1),'') fatherName,
+            COALESCE((SELECT g.mobile FROM v2_student_guardians sg JOIN v2_guardians g ON g.id=sg.guardian_id WHERE sg.student_id=s.id AND g.relation_type='father' LIMIT 1),'') fatherMobile,
+            COALESCE((SELECT g.email FROM v2_student_guardians sg JOIN v2_guardians g ON g.id=sg.guardian_id WHERE sg.student_id=s.id AND g.relation_type='father' LIMIT 1),'') fatherEmail,
+            COALESCE((SELECT g.qualification FROM v2_student_guardians sg JOIN v2_guardians g ON g.id=sg.guardian_id WHERE sg.student_id=s.id AND g.relation_type='father' LIMIT 1),'') fatherQualification,
+            COALESCE((SELECT g.occupation FROM v2_student_guardians sg JOIN v2_guardians g ON g.id=sg.guardian_id WHERE sg.student_id=s.id AND g.relation_type='father' LIMIT 1),'') fatherOccupation,
+            COALESCE((SELECT g.full_name FROM v2_student_guardians sg JOIN v2_guardians g ON g.id=sg.guardian_id WHERE sg.student_id=s.id AND g.relation_type='mother' LIMIT 1),'') motherName,
+            COALESCE((SELECT g.mobile FROM v2_student_guardians sg JOIN v2_guardians g ON g.id=sg.guardian_id WHERE sg.student_id=s.id AND g.relation_type='mother' LIMIT 1),'') motherMobile,
+            COALESCE((SELECT g.email FROM v2_student_guardians sg JOIN v2_guardians g ON g.id=sg.guardian_id WHERE sg.student_id=s.id AND g.relation_type='mother' LIMIT 1),'') motherEmail,
+            COALESCE((SELECT g.qualification FROM v2_student_guardians sg JOIN v2_guardians g ON g.id=sg.guardian_id WHERE sg.student_id=s.id AND g.relation_type='mother' LIMIT 1),'') motherQualification,
+            COALESCE((SELECT g.occupation FROM v2_student_guardians sg JOIN v2_guardians g ON g.id=sg.guardian_id WHERE sg.student_id=s.id AND g.relation_type='mother' LIMIT 1),'') motherOccupation,
+            COALESCE((SELECT g.full_name FROM v2_student_guardians sg JOIN v2_guardians g ON g.id=sg.guardian_id WHERE sg.student_id=s.id AND g.relation_type='guardian' LIMIT 1),'') guardianName,
+            COALESCE((SELECT g.mobile FROM v2_student_guardians sg JOIN v2_guardians g ON g.id=sg.guardian_id WHERE sg.student_id=s.id AND g.relation_type='guardian' LIMIT 1),'') guardianMobile,
+            COALESCE((SELECT g.email FROM v2_student_guardians sg JOIN v2_guardians g ON g.id=sg.guardian_id WHERE sg.student_id=s.id AND g.relation_type='guardian' LIMIT 1),'') guardianEmail,
+            COALESCE(l.class_leaving,'') classLeaving, l.date_of_leaving dateOfLeaving,
+            COALESCE(l.tc_number,'') leavingTcNo, l.tc_taken_date tcTakenDate
      FROM v2_students s
      LEFT JOIN v2_admissions a ON a.student_id = s.id
+     LEFT JOIN v2_academic_years y ON y.id = a.academic_year_id
+     LEFT JOIN v2_student_addresses addr ON addr.student_id = s.id AND addr.address_type='residential'
+     LEFT JOIN v2_student_leaving_records l ON l.student_id = s.id AND l.school_id = s.school_id
      WHERE ${where}
-     ORDER BY s.full_name`,
+     ORDER BY CASE WHEN s.admission_no REGEXP '^[0-9]+$' THEN 0 ELSE 1 END,
+              CASE WHEN s.admission_no REGEXP '^[0-9]+$' THEN CAST(s.admission_no AS UNSIGNED) ELSE NULL END,
+              s.admission_no, s.id`,
     params
   );
   return rows;

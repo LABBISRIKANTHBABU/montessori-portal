@@ -152,8 +152,13 @@ export const api = {
   updateStudent: (id:number,payload:Record<string,string>) => request<{data:any}>(`/students/${id}`,{method:"PUT",body:JSON.stringify(payload)}),
   changeStudentStatus: (id:number,payload:{status:string;reason?:string}) => request<{data:any}>(`/students/${id}/status`,{method:"PATCH",body:JSON.stringify(payload)}),
   restoreStudent: (id:number) => request<{data:any}>(`/students/${id}/restore`,{method:"POST"}),
-  exportStudents: (search = "", status = "", format: "csv" | "xlsx" = "csv") =>
-    requestBlob(`/students/export?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}&format=${format}`),
+  exportStudents: (search = "", status = "", format: "csv" | "xlsx" = "xlsx", options: { academicYear?: string; className?: string; sectionName?: string } = {}) => {
+    const params = new URLSearchParams({ search, status, format });
+    if (options.academicYear) params.set("academicYear", options.academicYear);
+    if (options.className) params.set("className", options.className);
+    if (options.sectionName) params.set("sectionName", options.sectionName);
+    return requestBlob(`/students/export?${params.toString()}`);
+  },
   bulkPromote: (studentIds: number[], targetClass: string, targetSection?: string) =>
     request<{data:any}>("/students/bulk/promote",{method:"POST",body:JSON.stringify({studentIds,targetClass,targetSection})}),
   bulkAssign: (studentIds: number[], assignType: "class" | "section", value: string) =>

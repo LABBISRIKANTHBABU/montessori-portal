@@ -348,6 +348,74 @@ app.get("/api/students", authenticate, requirePermission("student.view"), async 
   } catch (error) { next(error); }
 });
 
+app.get("/api/students/export", authenticate, requirePermission("student.view"), async (req: AuthRequest, res, next) => {
+  const search = String(req.query.search || "").trim();
+  const status = String(req.query.status || "").trim();
+  const format = String(req.query.format || "xlsx").trim().toLowerCase();
+  const filters = {
+    academicYear: String(req.query.academicYear || "").trim() || undefined,
+    className: String(req.query.class || req.query.className || "").trim() || undefined,
+    sectionName: String(req.query.section || req.query.sectionName || "").trim() || undefined,
+  };
+  const columns = [
+    ["Student UID", "studentUid", 18], ["Admission No", "admissionNo", 15], ["Name of the Pupil", "fullName", 30],
+    ["Gender", "gender", 10], ["Date of Birth", "dateOfBirth", 15], ["Status", "status", 14],
+    ["Academic Year", "academicYear", 16], ["Board", "board", 12], ["Class", "className", 14], ["Section", "sectionName", 10],
+    ["Date of Admission", "dateOfAdmission", 18], ["Student Aadhaar", "studentAadhaar", 18], ["PEN No", "penNo", 18],
+    ["APAAR ID", "apaarId", 18], ["Student Email", "studentEmail", 26], ["Nationality", "nationality", 16],
+    ["Religion", "religion", 16], ["Caste", "caste", 18], ["Sub Caste", "subCaste", 18], ["Mother Tongue", "motherTongue", 16],
+    ["Father Name", "fatherName", 26], ["Father Mobile", "fatherMobile", 16], ["Father Email", "fatherEmail", 26],
+    ["Father Qualification", "fatherQualification", 22], ["Father Occupation", "fatherOccupation", 22],
+    ["Mother Name", "motherName", 26], ["Mother Mobile", "motherMobile", 16], ["Mother Email", "motherEmail", 26],
+    ["Mother Qualification", "motherQualification", 22], ["Mother Occupation", "motherOccupation", 22],
+    ["Guardian Name", "guardianName", 26], ["Guardian Mobile", "guardianMobile", 16], ["Guardian Email", "guardianEmail", 26],
+    ["Residence Address", "residenceAddress", 45], ["City", "city", 16], ["State", "state", 16], ["PIN", "postalCode", 12],
+    ["Previous School / Class", "previousSchoolClass", 28], ["Previous TC No", "previousTcNo", 18],
+    ["Class Leaving", "classLeaving", 16], ["Date of Leaving", "dateOfLeaving", 16], ["Leaving TC No", "leavingTcNo", 18],
+    ["TC Taken Date", "tcTakenDate", 16], ["Photo Path", "photoPath", 32],
+  ] as const;
+  try {
+    const rows = await repo.exportStudents(req.auth!.schoolId, search, status || undefined, filters);
+    const filename = `students-export-${new Date().toISOString().slice(0, 10)}`;
+    if (format === "csv") {
+      const quote = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+      const csv = [
+        columns.map(([header]) => quote(header)).join(","),
+        ...rows.map((row: any) => columns.map(([, key]) => quote(row[key])).join(",")),
+      ].join("\r\n");
+      res.type("text/csv").attachment(`${filename}.csv`).send(csv);
+      return;
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Montessori Portal";
+    workbook.created = new Date();
+    const sheet = workbook.addWorksheet("Students");
+    sheet.columns = columns.map(([header, key, width]) => ({ header, key, width }));
+    sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0B2A4A" } };
+    sheet.getRow(1).alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    sheet.views = [{ state: "frozen", ySplit: 1 }];
+    sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columns.length } };
+    rows.forEach(row => sheet.addRow(row));
+    sheet.eachRow((row, rowNumber) => {
+      row.eachCell(cell => {
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFE5E7EB" } },
+          left: { style: "thin", color: { argb: "FFE5E7EB" } },
+          bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+          right: { style: "thin", color: { argb: "FFE5E7EB" } },
+        };
+        if (rowNumber > 1) cell.alignment = { vertical: "top", wrapText: true };
+      });
+    });
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}.xlsx"`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) { next(error); }
+});
+
 app.get("/api/students/:id", authenticate, requirePermission("student.view"), async (req: AuthRequest, res, next) => {
   try {
     const student = await repo.getStudent(req.auth!.schoolId, Number(req.params.id));
@@ -459,45 +527,6 @@ app.patch("/api/students/:id/status", authenticate, requirePermission("student.s
 app.post("/api/students/:id/restore", authenticate, requirePermission("student.status.change"), async (req: AuthRequest, res, next) => {
   try { res.json({ data: await repo.restoreStudent(req.auth!.schoolId, Number(req.params.id)) }); }
   catch (error) { next(error); }
-});
-
-app.get("/api/students/export", authenticate, requirePermission("student.view"), async (req: AuthRequest, res, next) => {
-  const search = String(req.query.search || "").trim();
-  const status = String(req.query.status || "").trim();
-  const format = String(req.query.format || "csv").trim();
-  try {
-    const rows = await repo.exportStudents(req.auth!.schoolId, search, status || undefined);
-    if (format === "xlsx") {
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet("Students");
-      sheet.columns = [
-        { header: "Admission No", key: "admissionNo", width: 15 },
-        { header: "Name", key: "fullName", width: 30 },
-        { header: "Gender", key: "gender", width: 10 },
-        { header: "Class", key: "className", width: 12 },
-        { header: "Section", key: "sectionName", width: 10 },
-        { header: "Status", key: "status", width: 12 },
-        { header: "Date of Birth", key: "dateOfBirth", width: 15 },
-        { header: "Board", key: "board", width: 10 },
-        { header: "Admission Date", key: "dateOfAdmission", width: 15 },
-        { header: "Email", key: "studentEmail", width: 25 },
-        { header: "Phone", key: "phone", width: 15 },
-      ];
-      sheet.getRow(1).font = { bold: true };
-      sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9D9D9" } };
-      for (const row of rows) sheet.addRow(row);
-      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", 'attachment; filename="students-export.xlsx"');
-      await workbook.xlsx.write(res);
-      res.end();
-    } else {
-      const quote = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-      const headers = ["Admission No", "Name", "Gender", "Class", "Section", "Status", "Date of Birth", "Board", "Admission Date", "Email", "Phone"];
-      const keys: (keyof any)[] = ["admissionNo", "fullName", "gender", "className", "sectionName", "status", "dateOfBirth", "board", "dateOfAdmission", "studentEmail", "phone"];
-      const csv = [headers.map(quote).join(","), ...rows.map((r: any) => keys.map(k => quote(r[k])).join(","))].join("\r\n");
-      res.type("text/csv").attachment("students-export.csv").send(csv);
-    }
-  } catch (error) { next(error); }
 });
 
 app.get("/api/students/:id/timeline", authenticate, requirePermission("student.view"), async (req: AuthRequest, res, next) => {

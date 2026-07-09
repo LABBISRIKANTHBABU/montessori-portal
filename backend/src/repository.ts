@@ -195,8 +195,8 @@ export async function restoreStudent(schoolId: number, studentId: number) {
   return restoreProductionStudent(schoolId, studentId);
 }
 
-export async function exportStudents(schoolId: number, search: string, status?: string) {
-  return exportProductionStudents(schoolId, search, status);
+export async function exportStudents(schoolId: number, search: string, status?: string, filters: Parameters<typeof exportProductionStudents>[3] = {}) {
+  return exportProductionStudents(schoolId, search, status, filters);
 }
 
 export async function checkDuplicate(schoolId: number, admissionNo: string, excludeStudentId?: number) {
