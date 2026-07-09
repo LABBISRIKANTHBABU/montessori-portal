@@ -666,7 +666,9 @@ app.post("/api/imports/legacy/stage", authenticate, requirePermission("import.le
               d.MotherTongue motherTongue, d.ClassAdmitted classAdmitted, d.ClassLeaving classLeaving,
               d.DateOfLeaving dateOfLeaving, d.LeavingTCNo leavingTcNo, d.TCTakenDate tcTakenDate,
               d.AcademicYear academicYear, d.Board board
-       FROM student_details d JOIN v2_schools s ON s.legacy_code = d.SchoolName WHERE s.id = ? ORDER BY d.id LIMIT 20000`,
+       FROM student_details d
+       JOIN v2_schools s ON s.legacy_code = CONVERT(d.SchoolName USING utf8mb4) COLLATE utf8mb4_unicode_ci
+       WHERE s.id = ? ORDER BY d.id LIMIT 20000`,
       [req.auth!.schoolId]
     );
     const parsed = source.map((raw, index) => ({ rowNumber: index + 1, raw }));

@@ -147,17 +147,17 @@ function toProductionInput(row: LegacyStudentRow): ProductionStudentInput {
   };
 }
 
-async function ensureMasters(schoolId: number, schoolCode: string) {
+async function ensureMasters(schoolId: number, schoolCode: string, dryRun: boolean) {
   const [years] = await getPool().execute<RowDataPacket[]>(
     `SELECT DISTINCT AcademicYear academicYear
      FROM student_details
-     WHERE SchoolName = ? AND AcademicYear IS NOT NULL AND TRIM(AcademicYear) NOT IN ('', '-', '_')`,
+     WHERE CONVERT(SchoolName USING utf8mb4) COLLATE utf8mb4_unicode_ci = ? AND AcademicYear IS NOT NULL AND TRIM(AcademicYear) NOT IN ('', '-', '_')`,
     [schoolCode]
   );
   for (const row of years) {
     const name = academicYearName(row.academicYear);
     const dates = academicYearDates(name);
-    await getPool().execute(
+    if (!dryRun) await getPool().execute(
       `INSERT IGNORE INTO v2_academic_years (school_id, name, start_date, end_date, is_current)
        VALUES (?, ?, ?, ?, 0)`,
       [schoolId, name, dates.start, dates.end]
@@ -165,22 +165,26 @@ async function ensureMasters(schoolId: number, schoolCode: string) {
   }
 
   const [boards] = await getPool().execute<RowDataPacket[]>(
-    "SELECT DISTINCT Board board FROM student_details WHERE SchoolName = ? AND Board IS NOT NULL",
+    "SELECT DISTINCT Board board FROM student_details WHERE CONVERT(SchoolName USING utf8mb4) COLLATE utf8mb4_unicode_ci = ? AND Board IS NOT NULL",
     [schoolCode]
   );
   for (const row of boards) {
     const code = board(row.board);
-    await getPool().execute("INSERT IGNORE INTO v2_boards (code, name) VALUES (?, ?)", [code, code]);
+    if (!dryRun) await getPool().execute("INSERT IGNORE INTO v2_boards (code, name) VALUES (?, ?)", [code, code]);
   }
 
-  await getPool().execute(
+  if (!dryRun) await getPool().execute(
     `INSERT IGNORE INTO v2_classes (school_id, board_code, name)
      SELECT ?, NULLIF(UPPER(TRIM(Board)), ''), TRIM(ClassAdmitted)
      FROM student_details
-     WHERE SchoolName = ? AND ClassAdmitted IS NOT NULL AND TRIM(ClassAdmitted) NOT IN ('', '-', '_')
+     WHERE CONVERT(SchoolName USING utf8mb4) COLLATE utf8mb4_unicode_ci = ? AND ClassAdmitted IS NOT NULL AND TRIM(ClassAdmitted) NOT IN ('', '-', '_')
      GROUP BY NULLIF(UPPER(TRIM(Board)), ''), TRIM(ClassAdmitted)`,
     [schoolId, schoolCode]
   );
+
+  if (dryRun) {
+    console.log(`[LEGACY SYNC] Dry run checked ${years.length} academic year value(s) and ${boards.length} board value(s). Master data was not written.`);
+  }
 }
 
 async function main() {
@@ -222,8 +226,11 @@ async function main() {
        COUNT(*) legacyTotal,
        SUM(CASE WHEN v.id IS NULL THEN 0 ELSE 1 END) alreadyImported
      FROM student_details d
-     LEFT JOIN v2_students v ON v.school_id = ? AND (v.legacy_student_id = d.id OR v.admission_no = d.AdmissionNo)
-     WHERE d.SchoolName = ?`,
+     LEFT JOIN v2_students v ON v.school_id = ? AND (
+       v.legacy_student_id = d.id
+       OR v.admission_no = CONVERT(d.AdmissionNo USING utf8mb4) COLLATE utf8mb4_unicode_ci
+     )
+     WHERE CONVERT(d.SchoolName USING utf8mb4) COLLATE utf8mb4_unicode_ci = ?`,
     [school.id, schoolCode]
   );
   const counts = countRows[0] || { legacyTotal: 0, alreadyImported: 0 };
@@ -232,7 +239,7 @@ async function main() {
   console.log(`[LEGACY SYNC] Legacy rows: ${Number(counts.legacyTotal || 0)}, already in v2: ${Number(counts.alreadyImported || 0)}`);
   console.log(`[LEGACY SYNC] Mode: ${dryRun ? "DRY RUN" : "IMPORT"}`);
 
-  await ensureMasters(Number(school.id), schoolCode);
+  await ensureMasters(Number(school.id), schoolCode, dryRun);
 
   const limitSql = limit > 0 ? "LIMIT ? OFFSET ?" : "";
   const params: Array<string | number> = [school.id, schoolCode];
@@ -240,8 +247,11 @@ async function main() {
   const [rows] = await getPool().execute<LegacyStudentRow[]>(
     `SELECT d.*
      FROM student_details d
-     LEFT JOIN v2_students v ON v.school_id = ? AND (v.legacy_student_id = d.id OR v.admission_no = d.AdmissionNo)
-     WHERE d.SchoolName = ? AND v.id IS NULL
+     LEFT JOIN v2_students v ON v.school_id = ? AND (
+       v.legacy_student_id = d.id
+       OR v.admission_no = CONVERT(d.AdmissionNo USING utf8mb4) COLLATE utf8mb4_unicode_ci
+     )
+     WHERE CONVERT(d.SchoolName USING utf8mb4) COLLATE utf8mb4_unicode_ci = ? AND v.id IS NULL
      ORDER BY d.id ${limitSql}`,
     params
   );
