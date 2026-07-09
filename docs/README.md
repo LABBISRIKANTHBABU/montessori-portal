@@ -6,6 +6,7 @@
 |---|---|
 | [LAUNCH_SCOPE.md](./LAUNCH_SCOPE.md) | Version 1.0/1.1/2.0 feature scope and release plan |
 | [31_BUSINESS_RULES.md](./31_BUSINESS_RULES.md) | Business rules, validation logic, and constraints |
+| [MASTER_BUILD_CONTRACT_2026-07-09.md](./MASTER_BUILD_CONTRACT_2026-07-09.md) | Latest client-review execution contract, module order, role rules and definition of done |
 
 ## Architecture & Design
 
@@ -23,6 +24,7 @@
 | [COMPLETE_DEVELOPMENT_HANDBOOK.md](./COMPLETE_DEVELOPMENT_HANDBOOK.md) | Full technical reference (952 lines) |
 | [STUDENT_MODULE_IMPLEMENTATION.md](./STUDENT_MODULE_IMPLEMENTATION.md) | Student field mapping and data rules |
 | [IMPORT_WORKFLOW_RUNBOOK.md](./IMPORT_WORKFLOW_RUNBOOK.md) | Bulk import procedure and validation |
+| [SPRINT_01_BULK_UPLOAD_IMPLEMENTATION_SPEC.md](./SPRINT_01_BULK_UPLOAD_IMPLEMENTATION_SPEC.md) | Sprint 1 implementation spec for staged student bulk upload |
 | [API_CONTRACT.md](./API_CONTRACT.md) | Endpoint contracts with example payloads |
 
 ## Operations
@@ -32,6 +34,7 @@
 | [PRODUCTION_DATABASE_RUNBOOK.md](./PRODUCTION_DATABASE_RUNBOOK.md) | Production database setup |
 | [PRODUCTION_READINESS_CHECKLIST.md](./PRODUCTION_READINESS_CHECKLIST.md) | Release gate checklist |
 | [LOCAL_SETUP.md](./LOCAL_SETUP.md) | Local development setup guide |
+| [LOCAL_DEV_BACKEND_FRONTEND_CHECK.md](./LOCAL_DEV_BACKEND_FRONTEND_CHECK.md) | Fix Vite proxy/backend/database local startup issues |
 
 ## Quality & Testing
 
@@ -47,10 +50,11 @@
 For new team members:
 
 1. Start with `LAUNCH_SCOPE.md` to understand what we're building
-2. Read `30_APPLICATION_WORKFLOW.md` for the user journey
-3. Read `ARCHITECTURE_LOCK.md` for technical decisions
-4. Read `LOCAL_SETUP.md` to get running locally
-5. Use `COMPLETE_DEVELOPMENT_HANDBOOK.md` as your daily reference
+2. Read `MASTER_BUILD_CONTRACT_2026-07-09.md` for the current execution order
+3. Read `30_APPLICATION_WORKFLOW.md` for the user journey
+4. Read `ARCHITECTURE_LOCK.md` for technical decisions
+5. Read `LOCAL_SETUP.md` to get running locally
+6. Use `COMPLETE_DEVELOPMENT_HANDBOOK.md` as your daily reference
 
 For client acceptance:
 
