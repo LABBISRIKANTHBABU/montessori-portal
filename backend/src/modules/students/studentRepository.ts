@@ -145,13 +145,17 @@ export async function listProductionStudents(schoolId: number, search: string, s
   const where = conditions.join(" AND ");
   const sortColumns = {
     name: "s.full_name",
-    admissionNo: "s.admission_no",
     className: "a.class_admitted",
     status: "s.current_status",
     createdAt: "s.created_at",
   } as const;
-  const sortColumn = sortColumns[filters.sortBy || "name"] || sortColumns.name;
   const sortDirection = filters.sortDir === "desc" ? "DESC" : "ASC";
+  const sortBy = filters.sortBy || "admissionNo";
+  const orderBy = sortBy === "admissionNo"
+    ? `CASE WHEN s.admission_no REGEXP '^[0-9]+$' THEN 0 ELSE 1 END ASC,
+       CASE WHEN s.admission_no REGEXP '^[0-9]+$' THEN CAST(s.admission_no AS UNSIGNED) ELSE NULL END ${sortDirection},
+       s.admission_no ${sortDirection}`
+    : `${sortColumns[sortBy] || sortColumns.name} ${sortDirection}`;
   // Get total count
   const [countResult] = await getPool().execute<RowDataPacket[]>(
     `SELECT COUNT(*) total
@@ -179,7 +183,7 @@ export async function listProductionStudents(schoolId: number, search: string, s
      LEFT JOIN v2_admissions a ON a.student_id = s.id
      LEFT JOIN v2_academic_years y ON y.id = a.academic_year_id
      WHERE ${where}
-     ORDER BY ${sortColumn} ${sortDirection}, s.id ASC LIMIT ? OFFSET ?`,
+     ORDER BY ${orderBy}, s.id ASC LIMIT ? OFFSET ?`,
     params
   );
   return { data: rows, total };

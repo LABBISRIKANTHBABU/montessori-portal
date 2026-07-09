@@ -12,11 +12,11 @@ export default function StudentsPage() {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
-  const [statusFilter, setStatusFilter] = useState("active");
+  const [statusFilter, setStatusFilter] = useState("");
   const [academicYear, setAcademicYear] = useState("");
   const [classFilter, setClassFilter] = useState("");
   const [sectionFilter, setSectionFilter] = useState("");
-  const [sortBy, setSortBy] = useState("name");
+  const [sortBy, setSortBy] = useState("admissionNo");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [academics, setAcademics] = useState<{ academicYears: string[]; classes: string[] }>({ academicYears: [], classes: [] });
   const [page, setPage] = useState(1);
@@ -102,6 +102,7 @@ export default function StudentsPage() {
   }
 
   const hasSelection = selectedIds.length > 0;
+  const filtersApplied = Boolean(statusFilter || academicYear || classFilter || sectionFilter || debouncedSearch);
 
   return (
     <div className="page">
@@ -122,6 +123,13 @@ export default function StudentsPage() {
       </div>
       
       <section className="panel table-panel">
+        <div className="directory-summary-strip">
+          <div>
+            <strong>{total.toLocaleString("en-IN")}</strong>
+            <span>{filtersApplied ? "matching student records" : "student records in this school"}</span>
+          </div>
+          <small>{filtersApplied ? "Filters are active. Clear filters to see the full school directory." : "Showing all statuses and all years by default."}</small>
+        </div>
         <div className="table-tools">
           <div className="search-box">
             <Search size={18} />

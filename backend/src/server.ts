@@ -333,13 +333,13 @@ app.get("/api/students", authenticate, requirePermission("student.view"), async 
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.min(100, Math.max(10, Number(req.query.limit) || 25));
   const offset = (page - 1) * limit;
-  const sortBy = String(req.query.sortBy || "name");
+  const sortBy = String(req.query.sortBy || "admissionNo");
   const sortDir: "asc" | "desc" = String(req.query.sortDir || "asc").toLowerCase() === "desc" ? "desc" : "asc";
   const filters = {
     academicYear: String(req.query.academicYear || "").trim() || undefined,
     className: String(req.query.class || req.query.className || "").trim() || undefined,
     sectionName: String(req.query.section || req.query.sectionName || "").trim() || undefined,
-    sortBy: ["name", "admissionNo", "className", "status", "createdAt"].includes(sortBy) ? sortBy as "name" | "admissionNo" | "className" | "status" | "createdAt" : "name",
+    sortBy: ["name", "admissionNo", "className", "status", "createdAt"].includes(sortBy) ? sortBy as "name" | "admissionNo" | "className" | "status" | "createdAt" : "admissionNo",
     sortDir,
   };
   try {
