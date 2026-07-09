@@ -11,6 +11,7 @@ type ValidationContext = {
   existingAdmissions: Set<string>;
   academicYears?: Set<string>;
   schoolExists?: boolean;
+  requiredFields?: readonly (typeof requiredFields[number])[];
 };
 
 const requiredFields = [
@@ -286,7 +287,13 @@ export function validateRows(rows: ParsedRow[], contextOrExisting: ValidationCon
     const errors: string[] = [];
     if (context.schoolExists === false) errors.push("School does not exist.");
 
-    for (const field of requiredFields) {
+    if (raw.id && !normalized.legacyStudentId) {
+      const legacyStudentId = Number(raw.id);
+      if (Number.isFinite(legacyStudentId)) normalized.legacyStudentId = legacyStudentId;
+    }
+
+    const fieldsRequiredForThisRun = context.requiredFields || requiredFields;
+    for (const field of fieldsRequiredForThisRun) {
       if (!normalized[field]) errors.push(`${canonicalLabels[field]} is required.`);
     }
 

@@ -6,7 +6,7 @@ import { encryptField, lastFour } from "../../security/fieldEncryption.js";
 export type ProductionStudentInput = {
   fullName: string; admissionNo: string; academicYear: string; board: string; dateOfAdmission: string;
   classAdmitted: string; sectionName?: string; idNo?: string; previousSchoolClass?: string; previousTcNo?: string;
-  dateOfBirth: string; gender?: "male" | "female" | "other"; nationality?: string; motherTongue?: string;
+  legacyStudentId?: number; dateOfBirth?: string; gender?: "male" | "female" | "other"; nationality?: string; motherTongue?: string;
   religion?: string; caste?: string; subCaste?: string; studentAadhaarNo?: string; penNo?: string; apaarId?: string;
   fatherName?: string; fatherAadhaarNo?: string; fatherMobileNumber?: string; fatherEmail?: string;
   fatherQualification?: string; fatherOccupation?: string; motherName?: string; motherAadhaarNo?: string;
@@ -19,8 +19,20 @@ export type ProductionStudentInput = {
 
 export async function createProductionStudent(input: ProductionStudentInput, context: { schoolId: number; userId: number }, photoPath?: string) {
   return withTransaction(async connection => {
+    const legacyStudentId = input.legacyStudentId ? Number(input.legacyStudentId) : null;
+    const admissionNo = String(input.admissionNo || "").trim();
+    if (!admissionNo) throw Object.assign(new Error("Admission number is required."), { statusCode: 422 });
+    if (!input.fullName?.trim()) throw Object.assign(new Error("Student name is required."), { statusCode: 422 });
+    if (!input.academicYear?.trim()) throw Object.assign(new Error("Academic year is required."), { statusCode: 422 });
+    if (!input.board?.trim()) throw Object.assign(new Error("Board is required."), { statusCode: 422 });
+    if (!input.dateOfAdmission?.trim()) throw Object.assign(new Error("Admission date is required."), { statusCode: 422 });
+    if (!input.classAdmitted?.trim()) throw Object.assign(new Error("Class admitted is required."), { statusCode: 422 });
+
     const [duplicate] = await connection.execute<RowDataPacket[]>(
-      "SELECT id FROM v2_students WHERE school_id = ? AND admission_no = ? FOR UPDATE", [context.schoolId, input.admissionNo]
+      `SELECT id FROM v2_students
+       WHERE school_id = ? AND (admission_no = ? OR (? IS NOT NULL AND legacy_student_id = ?))
+       FOR UPDATE`,
+      [context.schoolId, admissionNo, legacyStudentId, legacyStudentId]
     );
     if (duplicate.length) throw Object.assign(new Error("That admission number already exists in this school."), { statusCode: 409 });
     const [years] = await connection.execute<RowDataPacket[]>(
@@ -31,17 +43,17 @@ export async function createProductionStudent(input: ProductionStudentInput, con
     const studentUid = `MON-${context.schoolId}-${randomUUID().slice(0, 8).toUpperCase()}`;
     const [studentResult] = await connection.execute<ResultSetHeader>(
       `INSERT INTO v2_students
-       (school_id, student_uid, admission_no, full_name, gender, date_of_birth, nationality, mother_tongue,
+       (school_id, legacy_student_id, student_uid, admission_no, full_name, gender, date_of_birth, nationality, mother_tongue,
         religion, caste, sub_caste, student_email, photo_path, current_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [context.schoolId, studentUid, input.admissionNo, input.fullName, input.gender || null, input.dateOfBirth,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [context.schoolId, legacyStudentId, studentUid, admissionNo, input.fullName, input.gender || null, input.dateOfBirth || null,
        input.nationality || null, input.motherTongue || null, input.religion || null, input.caste || null,
        input.subCaste || null, input.studentEmail || null, photoPath || null, input.currentStatus || "active"]
     );
     const studentId = studentResult.insertId;
     const identifiers = [
       input.idNo && ["legacy_id", input.idNo, null, null],
-      ["admission_no", input.admissionNo, null, null],
+      ["admission_no", admissionNo, null, null],
       input.studentAadhaarNo && ["aadhaar", null, encryptField(input.studentAadhaarNo), `XXXX-XXXX-${lastFour(input.studentAadhaarNo)}`],
       input.penNo && ["pen", input.penNo, null, null],
       input.apaarId && ["apaar", input.apaarId, null, null]
@@ -72,13 +84,13 @@ export async function createProductionStudent(input: ProductionStudentInput, con
         [studentId, guardianResult.insertId, guardian.relation === "father" ? 1 : 0, guardian.mobile ? 1 : 0]
       );
     }
-    await connection.execute("INSERT INTO v2_student_addresses (student_id, address_type, full_address) VALUES (?, 'residential', ?)", [studentId, input.residenceAddress]);
+    await connection.execute("INSERT INTO v2_student_addresses (student_id, address_type, full_address) VALUES (?, 'residential', ?)", [studentId, input.residenceAddress || "Not available from legacy record"]);
     await connection.execute(
       `INSERT INTO v2_admissions
        (school_id, student_id, academic_year_id, board_code, admission_no, admission_date, class_admitted,
         section_name, previous_school_class, previous_tc_no, status, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', ?)`,
-      [context.schoolId, studentId, years[0].id, input.board, input.admissionNo, input.dateOfAdmission,
+      [context.schoolId, studentId, years[0].id, input.board, admissionNo, input.dateOfAdmission,
        input.classAdmitted, input.sectionName || null, input.previousSchoolClass || null, input.previousTcNo || null, context.userId]
     );
     if (input.classLeaving || input.dateOfLeaving || input.leavingTcNo) {
@@ -91,10 +103,10 @@ export async function createProductionStudent(input: ProductionStudentInput, con
     }
     await connection.execute(
       `INSERT INTO v2_audit_events (school_id, user_id, entity_type, entity_id, action_name, metadata_json)
-       VALUES (?, ?, 'student', ?, 'student.create', JSON_OBJECT('admissionNo', ?, 'studentUid', ?))`,
-      [context.schoolId, context.userId, studentId, input.admissionNo, studentUid]
+       VALUES (?, ?, 'student', ?, 'student.create', JSON_OBJECT('admissionNo', ?, 'studentUid', ?, 'legacyStudentId', ?))`,
+      [context.schoolId, context.userId, studentId, admissionNo, studentUid, legacyStudentId]
     );
-    return { id: studentId, schoolId: context.schoolId, studentUid, admissionNo: input.admissionNo, fullName: input.fullName, className: input.classAdmitted, sectionName: input.sectionName || "—", gender: input.gender || "other", status: input.currentStatus || "active" };
+    return { id: studentId, schoolId: context.schoolId, studentUid, admissionNo, fullName: input.fullName, className: input.classAdmitted, sectionName: input.sectionName || "—", gender: input.gender || "other", status: input.currentStatus || "active" };
   });
 }
 

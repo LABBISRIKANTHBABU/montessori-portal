@@ -44,8 +44,12 @@ test("tampered access token is rejected", async () => {
     role: "accountant",
     permissions: ["dashboard.view"],
   });
-  const replacement = token.endsWith("x") ? "y" : "x";
-  await assert.rejects(() => verifyAccessToken(`${token.slice(0, -1)}${replacement}`));
+  const parts = token.split(".");
+  assert.equal(parts.length, 3);
+  const payload = parts[1]!;
+  const replacement = payload[0] === "e" ? "f" : "e";
+  parts[1] = `${replacement}${payload.slice(1)}`;
+  await assert.rejects(() => verifyAccessToken(parts.join(".")));
 });
 
 test("school administrator cannot escape the assigned school", async () => {

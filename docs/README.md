@@ -25,6 +25,7 @@
 | [STUDENT_MODULE_IMPLEMENTATION.md](./STUDENT_MODULE_IMPLEMENTATION.md) | Student field mapping and data rules |
 | [IMPORT_WORKFLOW_RUNBOOK.md](./IMPORT_WORKFLOW_RUNBOOK.md) | Bulk import procedure and validation |
 | [SPRINT_01_BULK_UPLOAD_IMPLEMENTATION_SPEC.md](./SPRINT_01_BULK_UPLOAD_IMPLEMENTATION_SPEC.md) | Sprint 1 implementation spec for staged student bulk upload |
+| [LEGACY_STUDENT_SYNC_RUNBOOK.md](./LEGACY_STUDENT_SYNC_RUNBOOK.md) | Import existing legacy `student_details` records into v2 student tables |
 | [API_CONTRACT.md](./API_CONTRACT.md) | Endpoint contracts with example payloads |
 
 ## Operations

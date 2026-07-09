@@ -18,6 +18,7 @@
     "migrate:status": "tsx src/database/migrate.ts status",
     "migrate:dry-run": "tsx src/database/migrate.ts dry-run",
     "migrate:up": "tsx src/database/migrate.ts up",
+    "legacy:sync-students": "tsx src/scripts/syncLegacyStudents.ts",
     "user:provision-admin": "tsx src/users/provisionAdmin.ts",
     "user:reset-password": "tsx src/users/resetPassword.ts"
   },
