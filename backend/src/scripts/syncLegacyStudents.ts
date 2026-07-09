@@ -1,6 +1,7 @@
 import "dotenv/config";
 import type { RowDataPacket } from "mysql2/promise";
 import { closePool, getPool } from "../database/pool.js";
+import { getConfig } from "../config/env.js";
 import { createProductionStudent, type ProductionStudentInput } from "../modules/students/studentRepository.js";
 
 type LegacyStudentRow = RowDataPacket & {
@@ -183,10 +184,19 @@ async function ensureMasters(schoolId: number, schoolCode: string) {
 }
 
 async function main() {
+  const config = getConfig();
   const schoolCode = process.env.SCHOOL_CODE || "MSSSACK";
   const dryRun = process.env.DRY_RUN !== "false";
   const limit = Number(process.env.LIMIT || 0);
   const offset = Number(process.env.OFFSET || 0);
+
+  console.log("[LEGACY SYNC] Database target", {
+    host: config.DB_HOST,
+    port: config.DB_PORT,
+    database: config.DB_NAME,
+    user: config.DB_USER,
+    ssl: config.DB_SSL,
+  });
 
   const [schools] = await getPool().execute<RowDataPacket[]>(
     "SELECT id, legacy_code code, name FROM v2_schools WHERE legacy_code = ? LIMIT 1",
@@ -261,9 +271,35 @@ async function main() {
   if (dryRun) console.log("[LEGACY SYNC] No records were written. Re-run with DRY_RUN=false to import.");
 }
 
+function explainDatabaseFailure(error: unknown) {
+  const typed = error as Error & { code?: string; errno?: number; sqlMessage?: string };
+  if (typed.code !== "ER_ACCESS_DENIED_ERROR") return false;
+
+  const config = getConfig();
+  console.error("[LEGACY SYNC] MySQL rejected the configured login.");
+  console.error("[LEGACY SYNC] This is not a student-data bug. No legacy rows were read and no v2 students were written.");
+  console.error("[LEGACY SYNC] Check these values in backend/.env and Hostinger MySQL:");
+  console.error(`- DB_HOST=${config.DB_HOST}`);
+  console.error(`- DB_PORT=${config.DB_PORT}`);
+  console.error(`- DB_USER=${config.DB_USER}`);
+  console.error(`- DB_NAME=${config.DB_NAME}`);
+  console.error(`- DB_SSL=${config.DB_SSL}`);
+  console.error("- DB_PASSWORD must be the real password for that MySQL user.");
+  console.error("- Hostinger must allow remote MySQL access from your current public IP.");
+  console.error("- The MySQL user must have privileges on the selected database.");
+  console.error("[LEGACY SYNC] After fixing credentials, run:");
+  console.error("  cd E:\\montessori-portal\\backend");
+  console.error("  $env:SCHOOL_CODE=\"MSSSACK\"");
+  console.error("  $env:DRY_RUN=\"true\"");
+  console.error("  npm run legacy:sync-students");
+  return true;
+}
+
 main()
   .catch(error => {
-    console.error("[LEGACY SYNC] Failed", error instanceof Error ? error.message : error);
+    if (!explainDatabaseFailure(error)) {
+      console.error("[LEGACY SYNC] Failed", error instanceof Error ? error.message : error);
+    }
     process.exitCode = 1;
   })
   .finally(() => {

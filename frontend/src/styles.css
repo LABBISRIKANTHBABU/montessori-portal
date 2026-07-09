@@ -5562,8 +5562,48 @@ tbody tr:hover {
 }
 
 /* Student directory filters and create wizard refinements */
+.table-tools {
+  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) auto;
+  gap: 18px;
+}
+
+.table-tools .search-box {
+  width: 100%;
+  max-width: none;
+  min-height: 52px;
+  align-self: center;
+}
+
+.table-tools .search-box input {
+  min-height: 48px;
+  margin-top: 0;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.filter-group .select-wrap {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.filter-group .select-wrap select,
 .section-filter-input {
-  width: 96px;
+  width: auto;
+  min-width: 132px;
+  min-height: 44px;
+  margin-top: 0;
+}
+
+.section-filter-input {
+  width: 112px;
   min-height: 44px;
   margin-top: 0;
   border-radius: 12px;
@@ -5660,6 +5700,20 @@ tbody tr:hover {
 }
 
 @media(max-width:760px) {
+  .table-tools {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .filter-group {
+    justify-content: stretch;
+  }
+
+  .filter-group .select-wrap,
+  .filter-group .select-wrap select {
+    width: 100%;
+  }
+
   .photo-editor {
     grid-template-columns: 1fr
   }
