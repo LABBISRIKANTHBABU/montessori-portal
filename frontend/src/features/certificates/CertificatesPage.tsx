@@ -4,7 +4,7 @@ import { api, Student } from "../../api";
 
 const CERT_TYPES = [
   { value: "transfer", label: "Transfer Certificate", description: "Official school leaving and transfer record." },
-  { value: "study", label: "Study Certificate", description: "Confirmation of current or previous study." },
+  { value: "study", label: "Study & Conduct Certificate", description: "Official study period and conduct confirmation." },
   { value: "bonafide", label: "Bonafide Certificate", description: "Verified student identity and enrollment." },
   { value: "conduct", label: "Conduct Certificate", description: "Student conduct and character statement." },
   { value: "fee", label: "Fee Certificate", description: "Certified fee payment and dues record." },
