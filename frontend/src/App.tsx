@@ -23,6 +23,7 @@ const UsersPageFull = React.lazy(() => import("./features/users/UsersPage"));
 const SettingsPage = React.lazy(() => import("./features/settings/SettingsPage"));
 
 const GROUP_LOGO = "/montessori-golden-jubilee-logo.jpeg";
+const academicYearScopeKey = (schoolId: number) => `monte_academic_year_scope:${schoolId}`;
 
 type Session = {
   user: { name: string; role: string; roleCode: string; permissions: string[] };
@@ -519,6 +520,8 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
   const canOpenCurrentModule = !currentNavItem || permissions.has(currentNavItem[3]);
   const [availableSchools, setAvailableSchools] = useState<School[]>([session.school]);
   const [activeSchool, setActiveSchool] = useState<School>(session.school);
+  const [academicYears, setAcademicYears] = useState<string[]>([]);
+  const [activeAcademicYear, setActiveAcademicYear] = useState("");
   const scopedSession = { ...session, school: activeSchool };
 
   useEffect(() => {
@@ -541,6 +544,30 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
     setSearchQuery("");
     setSearchResults([]);
     if (destination) navigate(destination);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    api.academicSetup()
+      .then(({ data }) => {
+        if (cancelled) return;
+        const years = data.academicYears || [];
+        const savedYear = localStorage.getItem(academicYearScopeKey(activeSchool.id)) || "";
+        setAcademicYears(years);
+        setActiveAcademicYear(savedYear && years.includes(savedYear) ? savedYear : "");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAcademicYears([]);
+        setActiveAcademicYear("");
+      });
+    return () => { cancelled = true; };
+  }, [activeSchool.id]);
+
+  const selectAcademicYear = (year: string) => {
+    setActiveAcademicYear(year);
+    if (year) localStorage.setItem(academicYearScopeKey(activeSchool.id), year);
+    else localStorage.removeItem(academicYearScopeKey(activeSchool.id));
   };
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -697,7 +724,14 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
           </div>
           <div className="academic-context" title="Current academic year">
             <small>Academic year</small>
-            <strong>2026–27</strong>
+            <select
+              aria-label="Current academic year"
+              value={activeAcademicYear}
+              onChange={event => selectAcademicYear(event.target.value)}
+            >
+              <option value="">All years</option>
+              {academicYears.map(year => <option key={year} value={year}>{year}</option>)}
+            </select>
           </div>
           <div className="header-actions">
             <button className="icon-button" aria-label="Help" title="Help"><CircleHelp size={19} /></button>
@@ -758,7 +792,11 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
           {current === "dashboard" && (isSuperAdmin
             ? <SuperAdminDashboard session={scopedSession} activeSchool={activeSchool} onSelectCampus={selectCampus} />
             : <Dashboard session={scopedSession} />)}
-          {current === "students" && (creatingStudent ? <StudentCreatePage school={activeSchool} /> : managingImports ? <ImportPage /> : studentId ? <StudentProfilePage id={Number(studentId)} /> : <StudentsPage />)}
+          {current === "students" && (creatingStudent
+            ? <StudentCreatePage school={activeSchool} academicYear={activeAcademicYear} />
+            : managingImports ? <ImportPage />
+              : studentId ? <StudentProfilePage id={Number(studentId)} />
+                : <StudentsPage selectedAcademicYear={activeAcademicYear} />)}
           {current === "schools" && isSuperAdmin && <SchoolsPage activeSchoolId={activeSchool.id} onSelectCampus={selectCampus} />}
           {current === "users" && <UsersPageFull />}
           {current === "certificates" && <CertificatesPage />}

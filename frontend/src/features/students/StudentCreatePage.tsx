@@ -18,12 +18,12 @@ import {
 } from "lucide-react";
 import { api, School } from "../../api";
 
-type Props = { school: School };
+type Props = { school: School; academicYear?: string };
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
 const defaultClasses = ["Pre-K", "LKG", "UKG", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
 
-export default function StudentCreatePage({ school }: Props) {
+export default function StudentCreatePage({ school, academicYear = "" }: Props) {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>(1);
   const [saving, setSaving] = useState(false);
@@ -40,11 +40,22 @@ export default function StudentCreatePage({ school }: Props) {
   const [formData, setFormData] = useState<Record<string, any>>({
     nationality: "Indian",
     country: "India",
-    academicYear: "2026-27",
+    academicYear: academicYear || "2026-27",
     board: "CBSE",
   });
 
-  useEffect(() => { api.academicSetup().then(result => setAcademics(result.data)).catch(() => undefined); }, []);
+  useEffect(() => {
+    api.academicSetup().then(result => {
+      setAcademics(result.data);
+      setFormData(prev => {
+        if (prev.academicYear && result.data.academicYears.includes(prev.academicYear)) return prev;
+        const nextYear = academicYear && result.data.academicYears.includes(academicYear)
+          ? academicYear
+          : result.data.academicYears[0] || prev.academicYear || "";
+        return { ...prev, academicYear: nextYear };
+      });
+    }).catch(() => undefined);
+  }, [academicYear]);
 
   useEffect(() => {
     const saved = localStorage.getItem("student_draft");

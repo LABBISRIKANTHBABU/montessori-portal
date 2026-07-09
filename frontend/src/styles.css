@@ -4510,6 +4510,19 @@ textarea {
   font-weight: 700
 }
 
+.academic-context select {
+  width: 100%;
+  min-height: 24px;
+  margin: 0;
+  padding: 0 20px 0 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--navy);
+  font-size: 14px;
+  font-weight: 700
+}
+
 .academic-context {
   flex: 0 0 122px
 }

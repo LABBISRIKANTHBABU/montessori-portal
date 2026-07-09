@@ -6,14 +6,16 @@ import { useDebounce } from "../../hooks/useDebounce";
 import Pagination from "../../components/Pagination";
 import EmptyState from "../../components/EmptyState";
 
-export default function StudentsPage() {
+type Props = { selectedAcademicYear?: string };
+
+export default function StudentsPage({ selectedAcademicYear = "" }: Props) {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
   const [statusFilter, setStatusFilter] = useState("");
-  const [academicYear, setAcademicYear] = useState("");
+  const [academicYear, setAcademicYear] = useState(selectedAcademicYear);
   const [classFilter, setClassFilter] = useState("");
   const [sectionFilter, setSectionFilter] = useState("");
   const [sortBy, setSortBy] = useState("admissionNo");
@@ -29,6 +31,7 @@ export default function StudentsPage() {
   const [bulkLoading, setBulkLoading] = useState(false);
 
   useEffect(() => { api.academicSetup().then(result => setAcademics({ academicYears: result.data.academicYears, classes: result.data.classes })).catch(() => undefined); }, []);
+  useEffect(() => { setAcademicYear(selectedAcademicYear); }, [selectedAcademicYear]);
   useEffect(() => { setPage(1); }, [statusFilter, academicYear, classFilter, sectionFilter, sortBy, sortDir, debouncedSearch]);
 
   const load = () => {
