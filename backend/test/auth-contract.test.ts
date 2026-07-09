@@ -75,3 +75,12 @@ test("group super administrator cannot select a missing school", async () => {
     (error: Error & { statusCode?: number }) => error.statusCode === 404
   );
 });
+
+test("frontend-visible schools are limited to the approved campus order", async () => {
+  const { VISIBLE_SCHOOL_CODES, isFrontendVisibleSchoolCode } = await import("../src/schools/visibleSchools.js");
+  assert.deepEqual([...VISIBLE_SCHOOL_CODES], ["MEMHSVNK", "MSSSACK", "MHSA", "MIRSNHK", "MEMHSP", "MISNHK"]);
+  assert.equal(isFrontendVisibleSchoolCode("MSSSACK"), true);
+  assert.equal(isFrontendVisibleSchoolCode("MEEMSA"), false);
+  assert.equal(isFrontendVisibleSchoolCode("SSKH"), false);
+  assert.equal(isFrontendVisibleSchoolCode("MIH"), false);
+});

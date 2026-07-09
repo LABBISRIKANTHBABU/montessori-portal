@@ -10,6 +10,7 @@ import { getPool, query, withTransaction } from "./database/pool.js";
 import { createAccessToken } from "./security/accessToken.js";
 import { createProductionStudent, getProductionAcademicSetup, getProductionDashboard, getProductionStudent, listProductionStudents, updateProductionStudent, changeProductionStudentStatus, restoreProductionStudent, exportProductionStudents, checkDuplicateAdmission, bulkPromoteProductionStudents, bulkAssignProductionStudents, graduateGradeTenStudents, getProductionStudentTimeline, getProductionStudentMedical, upsertProductionStudentMedical, getProductionStudentNotes, createProductionStudentNote, deleteProductionStudentNote } from "./modules/students/studentRepository.js";
 import { listBatches, getBatch, stageBatch, approveBatch, existingAdmissionNumbers } from "./modules/imports/importService.js";
+import { visibleSchoolCodeParams, visibleSchoolOrderSql } from "./schools/visibleSchools.js";
 import type { RowDataPacket } from "mysql2/promise";
 
 // ─── Types ───────────────────────────────────────────────────────────────
@@ -31,15 +32,26 @@ const ROLE_NAMES: Record<string, string> = {
 // ─── Schools ─────────────────────────────────────────────────────────────
 
 export async function listSchools(): Promise<School[]> {
+  const visibleCodes = visibleSchoolCodeParams();
+  const visiblePlaceholders = visibleCodes.map(() => "?").join(", ");
+  const visibleOrder = visibleSchoolOrderSql("s");
   try {
     const [rows] = await getPool().execute<RowDataPacket[]>(
-      "SELECT id, legacy_code code, name, city FROM v2_schools WHERE status = 'active'"
+      `SELECT id, legacy_code code, name, city
+       FROM v2_schools s
+       WHERE status = 'active' AND legacy_code IN (${visiblePlaceholders})
+       ORDER BY ${visibleOrder}`,
+      [...visibleCodes, ...visibleCodes]
     );
     return rows as School[];
   } catch {
     // Fallback if status column doesn't exist
     const [rows] = await getPool().execute<RowDataPacket[]>(
-      "SELECT id, legacy_code code, name, city FROM v2_schools"
+      `SELECT id, legacy_code code, name, city
+       FROM v2_schools s
+       WHERE legacy_code IN (${visiblePlaceholders})
+       ORDER BY ${visibleOrder}`,
+      [...visibleCodes, ...visibleCodes]
     );
     return rows as School[];
   }
@@ -120,6 +132,9 @@ export async function getDashboard(schoolId: number) {
 }
 
 export async function getGroupOverview() {
+  const visibleCodes = visibleSchoolCodeParams();
+  const visiblePlaceholders = visibleCodes.map(() => "?").join(", ");
+  const visibleOrder = visibleSchoolOrderSql("s");
   const [rows] = await getPool().execute<RowDataPacket[]>(
     `SELECT s.id, s.legacy_code code, s.name, COALESCE(s.city, '') city,
             (SELECT COUNT(*) FROM v2_students st WHERE st.school_id=s.id AND st.deleted_at IS NULL) students,
@@ -129,8 +144,9 @@ export async function getGroupOverview() {
             (SELECT COUNT(*) FROM v2_certificates c WHERE c.school_id=s.id) certificates,
             (SELECT COUNT(*) FROM v2_users u JOIN v2_user_school_roles usr ON usr.user_id=u.id WHERE usr.school_id=s.id AND u.is_active=1) staff
      FROM v2_schools s
-     WHERE s.status='active'
-     ORDER BY s.name`
+     WHERE s.status='active' AND s.legacy_code IN (${visiblePlaceholders})
+     ORDER BY ${visibleOrder}`,
+    [...visibleCodes, ...visibleCodes]
   );
   const schools = rows.map((row: any) => ({
     id: Number(row.id), code: String(row.code), name: String(row.name), city: String(row.city),
