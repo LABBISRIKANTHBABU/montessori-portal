@@ -177,7 +177,7 @@ export async function listProductionStudents(schoolId: number, search: string, s
              FROM v2_student_guardians sg
              JOIN v2_guardians g ON g.id = sg.guardian_id
              WHERE sg.student_id = s.id
-             ORDER BY sg.is_primary DESC, sg.id
+             ORDER BY sg.is_primary DESC, sg.guardian_id
              LIMIT 1) guardianPhone
      FROM v2_students s
      LEFT JOIN v2_admissions a ON a.student_id = s.id

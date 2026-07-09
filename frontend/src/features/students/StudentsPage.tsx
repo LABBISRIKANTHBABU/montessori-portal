@@ -22,6 +22,7 @@ export default function StudentsPage() {
   const [page, setPage] = useState(1);
   const pageSize = 25;
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkAction, setBulkAction] = useState("");
   const [bulkValue, setBulkValue] = useState("");
@@ -32,6 +33,7 @@ export default function StudentsPage() {
 
   const load = () => {
     setLoading(true);
+    setLoadError("");
     api.students(debouncedSearch, statusFilter, page, {
       limit: pageSize,
       academicYear,
@@ -39,7 +41,11 @@ export default function StudentsPage() {
       sectionName: sectionFilter,
       sortBy,
       sortDir,
-    }).then(r => { setStudents(r.data); setTotal(r.total); }).catch(() => { setStudents([]); setTotal(0); }).finally(() => setLoading(false));
+    }).then(r => { setStudents(r.data); setTotal(r.total); }).catch(error => {
+      setStudents([]);
+      setTotal(0);
+      setLoadError(error instanceof Error ? error.message : "Student directory could not be loaded.");
+    }).finally(() => setLoading(false));
   };
 
   useEffect(() => { void load(); }, [debouncedSearch, statusFilter, academicYear, classFilter, sectionFilter, sortBy, sortDir, page]);
@@ -166,6 +172,12 @@ export default function StudentsPage() {
           </div>
         </div>
 
+        {loadError && (
+          <div className="form-error directory-error">
+            {loadError}
+          </div>
+        )}
+
         {hasSelection && (
           <div className="bulk-actions">
             <span>{selectedIds.length} student{selectedIds.length !== 1 ? "s" : ""} selected</span>
@@ -208,6 +220,8 @@ export default function StudentsPage() {
             <tbody>
               {loading ? (
                 <tr><td colSpan={9} style={{textAlign: "center", padding: "2rem"}}>Loading directory...</td></tr>
+              ) : loadError ? (
+                <tr><td colSpan={9}><EmptyState icon={<Users size={40} />} title="Student directory could not load" description={loadError} /></td></tr>
               ) : students.length === 0 ? (
                 <tr><td colSpan={9}><EmptyState icon={<Users size={40} />} title="No students found" description="Try adjusting your search or filters" /></td></tr>
               ) : (
