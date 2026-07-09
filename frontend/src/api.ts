@@ -1,4 +1,4 @@
-export type School = { id: number; code: string; name: string; city: string };
+export type School = { id: number; code: string; name: string; city?: string | null };
 export type Student = {
   id: number;
   studentUid: string;
@@ -47,7 +47,8 @@ const scopedAuthHeaders = () => ({
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (apiConfigurationError) throw new Error(apiConfigurationError);
   const isForm = options.body instanceof FormData;
-  const response = await fetch(apiPath(path), {
+  const target = apiPath(path);
+  const response = await fetch(target, {
       ...options,
       credentials: "include",
       headers: {
@@ -64,7 +65,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     localStorage.removeItem("monte_session");
     window.location.assign("/");
   }
-  if (!response.ok) throw new Error(body.message || "Something went wrong");
+  if (!response.ok) {
+    const message = typeof body.message === "string" && body.message.trim()
+      ? body.message
+      : `${options.method || "GET"} ${path} failed with ${response.status} ${response.statusText || "HTTP error"} from ${target}.`;
+    throw new Error(message);
+  }
   return body;
 }
 
@@ -84,7 +90,10 @@ async function requestBlob(path: string, options: RequestInit = {}): Promise<Blo
   }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.message || "File request failed.");
+    const message = typeof body.message === "string" && body.message.trim()
+      ? body.message
+      : `${options.method || "GET"} ${path} failed with ${response.status} ${response.statusText || "HTTP error"}.`;
+    throw new Error(message);
   }
   return response.blob();
 }

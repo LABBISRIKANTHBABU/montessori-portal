@@ -272,14 +272,18 @@ function Landing() {
   const [search, setSearch] = useState("");
   const [loadError, setLoadError] = useState(apiConfigurationError);
   useEffect(() => {
-    api.schools().then(r => setSchools(orderVisibleSchools(r.data)))
+    api.schools().then(r => {
+      setSchools(orderVisibleSchools(r.data));
+      setLoadError("");
+    })
       .catch(reason => setLoadError(reason instanceof Error ? reason.message : "Schools could not be loaded."));
   }, []);
 
+  const normalizedSearch = search.trim().toLowerCase();
   const filtered = schools.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.city.toLowerCase().includes(search.toLowerCase()) ||
-    s.code.toLowerCase().includes(search.toLowerCase())
+    String(s.name || "").toLowerCase().includes(normalizedSearch) ||
+    String(s.city || "").toLowerCase().includes(normalizedSearch) ||
+    String(s.code || "").toLowerCase().includes(normalizedSearch)
   );
 
   return (
@@ -316,7 +320,7 @@ function Landing() {
             </div>
             <div className="school-details">
               <strong>{school.name}</strong>
-              <small><Building2 size={13} /> {school.city}</small>
+              {school.city && <small><Building2 size={13} /> {school.city}</small>}
             </div>
             <ArrowRight size={20} className="card-arrow" />
           </button>
