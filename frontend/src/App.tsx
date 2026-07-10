@@ -620,37 +620,39 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
   };
 
   const moduleIcons: Record<string, typeof Users> = { students: Users, events: Calendar, certificates: FileBadge2, fees: WalletCards, documents: FileText, users: Users };
-  const typeColors: Record<string, string> = { student: "#6c5ce7", event: "#00b894", certificate: "#fdcb6e", receipt: "#0984e3", supplier: "#e17055", user: "#a29bfe" };
+  const typeColors: Record<string, string> = { student: "#002147", event: "#2e8b57", certificate: "#e6a700", receipt: "#3a7bd5", supplier: "#d9534f", user: "#002147" };
 
   return (
     <div className="portal">
       <aside className={menu ? "sidebar open" : "sidebar"}>
-        <div className="side-brand">
-          <Brand light />
-          <button className="icon-button mobile-only" onClick={() => setMenu(false)}><X /></button>
-        </div>
-        <div className="campus-card">
-          <span className="campus-mark">
-            <img src={GROUP_LOGO} alt="" aria-hidden="true" />
-          </span>
-          <div>
-            <small>{isSuperAdmin ? "OPERATING CAMPUS" : "ASSIGNED CAMPUS"}</small>
-            {isSuperAdmin ? (
-              <select
-                className="campus-switcher"
-                aria-label="Operating campus"
-                value={activeSchool.id}
-                onChange={event => {
-                  const selected = availableSchools.find(school => school.id === Number(event.target.value));
-                  if (selected) selectCampus(selected);
-                }}
-              >
-                {availableSchools.map(school => <option key={school.id} value={school.id}>{school.name}</option>)}
-              </select>
-            ) : <strong>{activeSchool.name}</strong>}
+        <div className="sidebar-top">
+          <div className="side-brand">
+            <Brand light />
+            <button className="icon-button mobile-only" onClick={() => setMenu(false)}><X /></button>
+          </div>
+          <div className="campus-card">
+            <span className="campus-mark">
+              <img src={GROUP_LOGO} alt="" aria-hidden="true" />
+            </span>
+            <div>
+              <small>{isSuperAdmin ? "OPERATING CAMPUS" : "ASSIGNED CAMPUS"}</small>
+              {isSuperAdmin ? (
+                <select
+                  className="campus-switcher"
+                  aria-label="Operating campus"
+                  value={activeSchool.id}
+                  onChange={event => {
+                    const selected = availableSchools.find(school => school.id === Number(event.target.value));
+                    if (selected) selectCampus(selected);
+                  }}
+                >
+                  {availableSchools.map(school => <option key={school.id} value={school.id}>{school.name}</option>)}
+                </select>
+              ) : <strong>{activeSchool.name}</strong>}
+            </div>
           </div>
         </div>
-        <nav>
+        <nav className="sidebar-menu">
           <span className="nav-label">WORKSPACE</span>
           {visibleNavItems.map(([path, label, Icon]) => (
             <button key={path} className={current === path ? "active" : ""} onClick={() => { navigate(`/${path}`); setMenu(false); }}>
@@ -658,12 +660,15 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
             </button>
           ))}
         </nav>
-        <div className="side-user">
-          <span>{session.user.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}</span>
-          <div><strong>{session.user.name}</strong><small>{session.user.role}</small></div>
-          <button onClick={onLogout} title="Sign out"><LogOut size={17} /></button>
+        <div className="sidebar-bottom">
+          <div className="side-user">
+            <span>{session.user.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}</span>
+            <div><strong>{session.user.name}</strong><small>{session.user.role}</small></div>
+            <button onClick={onLogout} title="Sign out"><LogOut size={17} /></button>
+          </div>
         </div>
       </aside>
+      {menu && <div className="sidebar-backdrop" onClick={() => setMenu(false)} />}
       <main className="workspace">
         <header>
           <button className="icon-button mobile-only" onClick={() => setMenu(true)}><Menu /></button>
@@ -678,29 +683,29 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
             {searchOpen && (
               <div className="search-dropdown" style={{
                 position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4,
-                background: "#1a1d2e", border: "1px solid #2a2d3e", borderRadius: 10,
-                maxHeight: 360, overflowY: "auto", zIndex: 100, boxShadow: "0 8px 32px rgba(0,0,0,.4)"
+                background: "#fff", border: "1px solid var(--line)", borderRadius: 14,
+                maxHeight: 360, overflowY: "auto", zIndex: 100, boxShadow: "0 8px 32px rgba(0,33,71,.12)"
               }}>
                 {searchLoading ? (
-                  <div style={{ padding: "1.5rem", textAlign: "center", color: "#8b8fa3" }}>Searching...</div>
+                  <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--muted)" }}>Searching...</div>
                 ) : searchResults.length === 0 ? (
-                  <div style={{ padding: "1.5rem", textAlign: "center", color: "#8b8fa3" }}>No results found</div>
+                  <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--muted)" }}>No results found</div>
                 ) : (
                   <>
                     {Object.entries(searchResults.reduce((acc, r) => { (acc[r.type] = acc[r.type] || []).push(r); return acc; }, {} as Record<string, SearchResult[]>)).map(([type, items]) => (
                       <div key={type}>
-                        <div style={{ padding: "0.5rem 1rem", fontSize: 11, fontWeight: 700, color: "#8b8fa3", textTransform: "uppercase", letterSpacing: "0.05em" }}>{type}s</div>
+                        <div style={{ padding: "0.5rem 1rem", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{type}s</div>
                         {items.map(item => (
                           <button key={`${item.type}-${item.id}`} className="search-result-item" style={{
                             display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "0.6rem 1rem",
-                            background: "none", border: "none", color: "#e2e4e9", cursor: "pointer", textAlign: "left"
+                            background: "none", border: "none", color: "var(--ink)", cursor: "pointer", textAlign: "left"
                           }} onClick={() => { navigate(`/${item.module}`); setSearchOpen(false); setSearchQuery(""); }}>
-                            <span style={{ width: 32, height: 32, borderRadius: 8, background: `${typeColors[item.type] || "#6c5ce7"}22`, color: typeColors[item.type] || "#6c5ce7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <span style={{ width: 32, height: 32, borderRadius: 8, background: `${typeColors[item.type] || "#002147"}22`, color: typeColors[item.type] || "#002147", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                               {(() => { const Ic = moduleIcons[item.module] || Users; return <Ic size={16} />; })()}
                             </span>
                             <div style={{ minWidth: 0 }}>
                               <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</div>
-                              <div style={{ fontSize: 11, color: "#8b8fa3", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.subtitle}</div>
+                              <div style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.subtitle}</div>
                             </div>
                           </button>
                         ))}
@@ -745,7 +750,7 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
                 {unreadCount > 0 && (
                   <span style={{
                     position: "absolute", top: 2, right: 2, width: 18, height: 18, borderRadius: "50%",
-                    background: "#e74c3c", color: "#fff", fontSize: 10, fontWeight: 700,
+                    background: "var(--danger)", color: "#fff", fontSize: 10, fontWeight: 700,
                     display: "flex", alignItems: "center", justifyContent: "center"
                   }}>{unreadCount > 9 ? "9+" : unreadCount}</span>
                 )}
@@ -753,27 +758,27 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
               {notifOpen && (
                 <div style={{
                   position: "absolute", top: "100%", right: 0, marginTop: 4, width: 340,
-                  background: "#1a1d2e", border: "1px solid #2a2d3e", borderRadius: 10,
-                  maxHeight: 400, overflowY: "auto", zIndex: 100, boxShadow: "0 8px 32px rgba(0,0,0,.4)"
+                  background: "#fff", border: "1px solid var(--line)", borderRadius: 14,
+                  maxHeight: 400, overflowY: "auto", zIndex: 100, boxShadow: "0 8px 32px rgba(0,33,71,.12)"
                 }}>
-                  <div style={{ padding: "0.8rem 1rem", borderBottom: "1px solid #2a2d3e", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <strong style={{ fontSize: 14 }}>Notifications</strong>
+                  <div style={{ padding: "0.8rem 1rem", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <strong style={{ fontSize: 14, color: "var(--ink)" }}>Notifications</strong>
                     {unreadCount > 0 && (
-                      <button onClick={markAllRead} style={{ background: "none", border: "none", color: "#6c5ce7", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>Mark all read</button>
+                      <button onClick={markAllRead} style={{ background: "none", border: "none", color: "var(--navy)", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Mark all read</button>
                     )}
                   </div>
                   {notifications.length === 0 ? (
-                    <div style={{ padding: "2rem", textAlign: "center", color: "#8b8fa3", fontSize: 13 }}>No notifications</div>
+                    <div style={{ padding: "2rem", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>No notifications</div>
                   ) : (
                     notifications.map(n => (
                       <div key={n.id} style={{
-                        padding: "0.7rem 1rem", borderBottom: "1px solid #2a2d3e",
-                        background: n.read ? "transparent" : "#6c5ce710",
+                        padding: "0.7rem 1rem", borderBottom: "1px solid var(--line)",
+                        background: n.read ? "transparent" : "rgba(0,33,71,.04)",
                         opacity: n.read ? 0.6 : 1, cursor: "pointer"
                       }} onClick={() => { if (n.module) navigate(`/${n.module}`); setNotifOpen(false); }}>
-                        <div style={{ fontSize: 13, fontWeight: n.read ? 400 : 600 }}>{n.title}</div>
-                        <div style={{ fontSize: 11, color: "#8b8fa3", marginTop: 2 }}>{n.message}</div>
-                        <div style={{ fontSize: 10, color: "#555", marginTop: 4 }}>{new Date(n.createdAt).toLocaleString()}</div>
+                        <div style={{ fontSize: 13, fontWeight: n.read ? 400 : 600, color: "var(--ink)" }}>{n.title}</div>
+                        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{n.message}</div>
+                        <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>{new Date(n.createdAt).toLocaleString()}</div>
                       </div>
                     ))
                   )}
@@ -788,31 +793,33 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
             </div>
           </div>
         </header>
-        {!canOpenCurrentModule ? (
-          <div className="page">
-            <div className="form-error" role="alert">You do not have permission to open this module.</div>
-          </div>
-        ) : <React.Fragment key={`${activeSchool.id}:${current}`}>
-          {current === "dashboard" && (isSuperAdmin
-            ? <SuperAdminDashboard session={scopedSession} activeSchool={activeSchool} onSelectCampus={selectCampus} />
-            : <Dashboard session={scopedSession} />)}
-          {current === "students" && (creatingStudent
-            ? <StudentCreatePage school={activeSchool} academicYear={activeAcademicYear} />
-            : managingImports ? <ImportPage />
-              : studentId ? <StudentProfilePage id={Number(studentId)} />
-                : <StudentsPage selectedAcademicYear={activeAcademicYear} />)}
-          {current === "schools" && isSuperAdmin && <SchoolsPage activeSchoolId={activeSchool.id} onSelectCampus={selectCampus} />}
-          {current === "users" && <UsersPageFull />}
-          {current === "certificates" && <CertificatesPage />}
-          {current === "fees" && <AccountsPage />}
-          {current === "documents" && <DocumentsPage />}
-          {current === "events" && <EventsPage />}
-          {current === "reports" && <ReportsPage />}
-          {current === "settings" && <SettingsPage />}
-          {!["dashboard", "students", "schools", "users", "certificates", "fees", "documents", "events", "reports", "settings"].includes(current) && (
-            <ModulePlaceholder name={configuredNavItems.find(n => n[0] === current)?.[1] || "Module"} />
-          )}
-        </React.Fragment>}
+        <div className="workspace-content">
+          {!canOpenCurrentModule ? (
+            <div className="page">
+              <div className="form-error" role="alert">You do not have permission to open this module.</div>
+            </div>
+          ) : <React.Fragment key={`${activeSchool.id}:${current}`}>
+            {current === "dashboard" && (isSuperAdmin
+              ? <SuperAdminDashboard session={scopedSession} activeSchool={activeSchool} onSelectCampus={selectCampus} />
+              : <Dashboard session={scopedSession} />)}
+            {current === "students" && (creatingStudent
+              ? <StudentCreatePage school={activeSchool} academicYear={activeAcademicYear} />
+              : managingImports ? <ImportPage />
+                : studentId ? <StudentProfilePage id={Number(studentId)} />
+                  : <StudentsPage selectedAcademicYear={activeAcademicYear} />)}
+            {current === "schools" && isSuperAdmin && <SchoolsPage activeSchoolId={activeSchool.id} onSelectCampus={selectCampus} />}
+            {current === "users" && <UsersPageFull />}
+            {current === "certificates" && <CertificatesPage />}
+            {current === "fees" && <AccountsPage />}
+            {current === "documents" && <DocumentsPage />}
+            {current === "events" && <EventsPage />}
+            {current === "reports" && <ReportsPage />}
+            {current === "settings" && <SettingsPage />}
+            {!["dashboard", "students", "schools", "users", "certificates", "fees", "documents", "events", "reports", "settings"].includes(current) && (
+              <ModulePlaceholder name={configuredNavItems.find(n => n[0] === current)?.[1] || "Module"} />
+            )}
+          </React.Fragment>}
+        </div>
       </main>
     </div>
   );
@@ -1061,8 +1068,8 @@ function Dashboard({ session }: { session: NonNullable<Session> }) {
                     }} onClick={() => navigate(`/${task.module}`)}>
                       <span style={{
                         width: 32, height: 32, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-                        background: task.count > 0 ? "#e74c3c22" : "#00b89422",
-                        color: task.count > 0 ? "#e74c3c" : "#00b894", flexShrink: 0
+                        background: task.count > 0 ? "rgba(217,83,79,.1)" : "rgba(46,139,87,.1)",
+                        color: task.count > 0 ? "var(--danger)" : "var(--success)", flexShrink: 0
                       }}>
                         {task.count > 0 ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
                       </span>
@@ -1071,7 +1078,7 @@ function Dashboard({ session }: { session: NonNullable<Session> }) {
                       </div>
                       {task.count > 0 && (
                         <span style={{
-                          background: "#e74c3c22", color: "#e74c3c", padding: "2px 8px", borderRadius: 12,
+                          background: "rgba(217,83,79,.1)", color: "var(--danger)", padding: "2px 8px", borderRadius: 12,
                           fontSize: 11, fontWeight: 700
                         }}>{task.count}</span>
                       )}
@@ -1205,19 +1212,19 @@ function QuickActionsPanel({ role, navigate }: { role: string; navigate: any }) 
   const actions: { label: string; desc: string; icon: typeof Users; path: string; color: string }[] = [];
 
   if (["School Admin", "Office Staff", "Principal"].includes(role)) {
-    actions.push({ label: "Add Student", desc: "New admission", icon: Users, path: "/students/new", color: "#6c5ce7" });
+    actions.push({ label: "Add Student", desc: "New admission", icon: Users, path: "/students/new", color: "#002147" });
   }
   if (["School Admin", "Principal", "Office Staff"].includes(role)) {
-    actions.push({ label: "Create Event", desc: "Plan event", icon: Calendar, path: "/events", color: "#00b894" });
+    actions.push({ label: "Create Event", desc: "Plan event", icon: Calendar, path: "/events", color: "#2e8b57" });
   }
   if (["School Admin", "Accountant", "Office Staff"].includes(role)) {
-    actions.push({ label: "Record Payment", desc: "Collect fee", icon: WalletCards, path: "/fees", color: "#0984e3" });
+    actions.push({ label: "Record Payment", desc: "Collect fee", icon: WalletCards, path: "/fees", color: "#3a7bd5" });
   }
   if (["School Admin", "Office Staff"].includes(role)) {
-    actions.push({ label: "Issue Certificate", desc: "Generate TC", icon: FileBadge2, path: "/certificates", color: "#fdcb6e" });
+    actions.push({ label: "Issue Certificate", desc: "Generate TC", icon: FileBadge2, path: "/certificates", color: "#e6a700" });
   }
   if (["School Admin", "Teacher"].includes(role)) {
-    actions.push({ label: "View Reports", desc: "Analytics", icon: BarChart3, path: "/reports", color: "#e17055" });
+    actions.push({ label: "View Reports", desc: "Analytics", icon: BarChart3, path: "/reports", color: "#d9534f" });
   }
 
   if (actions.length === 0) return null;
@@ -1231,14 +1238,14 @@ function QuickActionsPanel({ role, navigate }: { role: string; navigate: any }) 
         {actions.map((a, i) => (
           <button key={i} onClick={() => navigate(a.path)} style={{
             display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-            padding: "1rem 0.5rem", background: "#1a1d2e", border: "1px solid #2a2d3e",
-            borderRadius: 10, cursor: "pointer", color: "#e2e4e9", transition: "border-color 0.15s"
-          }} onMouseEnter={e => (e.currentTarget.style.borderColor = a.color)} onMouseLeave={e => (e.currentTarget.style.borderColor = "#2a2d3e")}>
-            <span style={{ width: 36, height: 36, borderRadius: 10, background: `${a.color}22`, color: a.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            padding: "1rem 0.5rem", background: "#fff", border: "1px solid var(--line)",
+            borderRadius: 10, cursor: "pointer", color: "var(--ink)", transition: "border-color 0.15s"
+          }} onMouseEnter={e => (e.currentTarget.style.borderColor = a.color)} onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--line)")}>
+            <span style={{ width: 36, height: 36, borderRadius: 10, background: `${a.color}15`, color: a.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <a.icon size={18} />
             </span>
-            <span style={{ fontSize: 12, fontWeight: 600 }}>{a.label}</span>
-            <span style={{ fontSize: 10, color: "#8b8fa3" }}>{a.desc}</span>
+            <span style={{ fontSize: 12, fontWeight: 700 }}>{a.label}</span>
+            <span style={{ fontSize: 10, color: "var(--muted)" }}>{a.desc}</span>
           </button>
         ))}
       </div>

@@ -30,7 +30,8 @@
 
 body {
   margin: 0;
-  min-width: 320px
+  min-width: 320px;
+  overflow: hidden
 }
 
 button,
@@ -549,20 +550,41 @@ select:focus {
 }
 
 .portal {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
   background: #f6f4ed
 }
 
 .sidebar {
-  position: fixed;
-  inset: 0 auto 0 0;
   width: 270px;
+  height: 100vh;
   background: var(--forest);
   color: #eaf0ec;
-  padding: 26px 18px;
+  padding: 0;
   z-index: 10;
   display: flex;
-  flex-direction: column
+  flex-direction: column;
+  flex: 0 0 auto;
+  overflow: hidden
+}
+
+.sidebar-top {
+  padding: 26px 18px 0;
+  flex: 0 0 auto
+}
+
+.sidebar-menu {
+  flex: 1 1 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 18px;
+  margin-top: 25px
+}
+
+.sidebar-bottom {
+  padding: 0 18px;
+  flex: 0 0 auto
 }
 
 .side-brand {
@@ -611,10 +633,6 @@ select:focus {
   overflow: hidden;
   display: block;
   margin-top: 3px
-}
-
-.sidebar nav {
-  margin-top: 25px
 }
 
 .nav-label {
@@ -702,10 +720,14 @@ select:focus {
 
 .workspace {
   margin-left: 270px;
-  min-height: 100vh
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 0
 }
 
-.workspace>header {
+.workspace > header {
   height: 72px;
   border-bottom: 1px solid var(--line);
   background: rgba(255, 253, 248, .88);
@@ -715,7 +737,15 @@ select:focus {
   padding: 0 35px;
   position: sticky;
   top: 0;
-  z-index: 5
+  z-index: 5;
+  flex: 0 0 auto
+}
+
+.workspace-content {
+  flex: 1 1 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0
 }
 
 .header-search {
@@ -1150,6 +1180,10 @@ th {
   display: none
 }
 
+.sidebar-backdrop {
+  display: none
+}
+
 @keyframes rise {
   from {
     opacity: 0;
@@ -1160,6 +1194,11 @@ th {
     opacity: 1;
     transform: none
   }
+}
+
+@keyframes fade-in {
+  from { opacity: 0 }
+  to { opacity: 1 }
 }
 
 @media(max-width:1000px) {
@@ -1189,49 +1228,6 @@ th {
 }
 
 @media(max-width:760px) {
-  .mobile-only {
-    display: grid
-  }
-
-  .sidebar {
-    transform: translateX(-100%);
-    transition: .25s;
-    width: min(290px, 90vw)
-  }
-
-  .sidebar.open {
-    transform: none
-  }
-
-  .workspace {
-    margin-left: 0
-  }
-
-  .workspace>header {
-    padding: 0 15px
-  }
-
-  .header-search {
-    display: none
-  }
-
-  .header-actions {
-    margin-left: auto
-  }
-
-  .page {
-    padding: 25px 16px
-  }
-
-  .page-title {
-    align-items: flex-start;
-    flex-direction: column
-  }
-
-  .metrics {
-    grid-template-columns: 1fr 1fr
-  }
-
   .login-page {
     display: block
   }
@@ -1284,11 +1280,6 @@ th {
 
   .student-form label {
     grid-column: 1
-  }
-
-  .table-tools {
-    align-items: stretch;
-    flex-direction: column
   }
 
   .search-box {
@@ -3575,11 +3566,11 @@ tr.archived {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Phase 18: UI/UX – Responsive Breakpoints
+   Responsive Breakpoints (Consolidated)
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Tablet: 768px – 1024px */
-@media(min-width:768px) and (max-width:1024px) {
+/* Tablet: 768px – 1100px */
+@media(min-width:768px) and (max-width:1100px) {
   .dashboard-grid {
     grid-template-columns: 1fr 1fr;
   }
@@ -3599,52 +3590,6 @@ tr.archived {
   .profile-form {
     grid-template-columns: 1fr 1fr;
   }
-}
-
-/* Mobile: < 768px */
-@media(max-width:768px) {
-  .sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.25s ease;
-  }
-
-  .sidebar.open {
-    transform: none;
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
-  }
-
-  .workspace {
-    margin-left: 0 !important;
-  }
-
-  .workspace>header {
-    padding: 0 16px;
-  }
-
-  .header-search {
-    display: none !important;
-  }
-
-  .page {
-    padding: 20px 14px;
-  }
-
-  .page-title {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-  }
-
-  .page-title .header-actions {
-    width: 100%;
-  }
-
-  .metrics {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
 
   .table-tools {
     flex-direction: column;
@@ -3652,30 +3597,6 @@ tr.archived {
 
   .filter-group {
     width: 100%;
-  }
-
-  .student-intake-form {
-    grid-template-columns: 1fr !important;
-  }
-
-  .form-progress {
-    position: static !important;
-  }
-
-  .profile-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .profile-form {
-    grid-template-columns: 1fr;
-  }
-
-  .student-create-page {
-    padding: 16px 12px 48px;
-  }
-
-  .modal-overlay {
-    padding: 12px;
   }
 }
 
@@ -4369,13 +4290,22 @@ textarea {
 
 .sidebar {
   width: 288px;
-  padding: 28px 20px;
+  padding: 0;
   background: var(--navy);
   color: #fff
 }
 
-.sidebar nav {
-  margin-top: 28px
+.sidebar-top {
+  padding: 28px 20px 0
+}
+
+.sidebar-menu {
+  margin-top: 28px;
+  padding: 0 20px
+}
+
+.sidebar-bottom {
+  padding: 0 20px
 }
 
 .sidebar nav button {
@@ -5164,7 +5094,7 @@ tbody tr:hover {
     width: 210px
   }
 
-  .header-actions > .icon-button:first-child,
+  .header-actions > .icon-button[title="Help"],
   .header-actions > .icon-button[title="Settings"] {
     display: none
   }
@@ -5174,13 +5104,39 @@ tbody tr:hover {
   }
 }
 
-@media(max-width:760px) {
+/* ─── Mobile: < 768px ─────────────────────────────────────────────────── */
+@media(max-width:768px) {
   .sidebar {
-    width: min(310px, 90vw)
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: min(310px, 85vw);
+    height: 100vh;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 200
+  }
+
+  .sidebar.open {
+    transform: none;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25)
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 33, 71, .4);
+    z-index: 150;
+    animation: fade-in .2s ease
+  }
+
+  .mobile-only {
+    display: grid
   }
 
   .workspace {
-    margin-left: 0
+    margin-left: 0 !important;
+    width: 100%
   }
 
   .workspace::before {
@@ -5188,22 +5144,31 @@ tbody tr:hover {
   }
 
   .workspace > header {
-    min-height: 72px;
+    min-height: 64px;
+    height: auto;
     padding: 10px 14px;
     gap: 10px
   }
 
-  .header-search,
+  .header-search {
+    display: none !important
+  }
+
+  .header-actions > .icon-button[title="Help"],
+  .header-actions > .icon-button[title="Settings"],
+  .header-actions > .icon-button.future-control {
+    display: none
+  }
+
   .academic-context,
-  .header-profile,
-  .header-actions > button {
+  .header-profile > div {
     display: none
   }
 
   .global-school-context {
     width: auto;
     flex: 1;
-    min-height: 48px;
+    min-height: 44px;
     padding: 6px 10px
   }
 
@@ -5217,17 +5182,17 @@ tbody tr:hover {
   }
 
   .page {
-    padding: 28px 16px 56px
+    padding: 24px 16px 48px
   }
 
   .page-title {
-    align-items: stretch;
-    gap: 20px
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 16px
   }
 
-  .page-title h1,
-  .profile-title h1 {
-    font-size: 34px
+  .page-title h1 {
+    font-size: 30px
   }
 
   .header-actions {
@@ -5240,13 +5205,47 @@ tbody tr:hover {
     flex: 1 1 auto
   }
 
+  .metrics {
+    grid-template-columns: 1fr 1fr
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr
+  }
+
   .table-tools {
+    flex-direction: column;
     padding: 14px;
     gap: 12px
   }
 
   .filter-group {
+    width: 100%;
     flex-wrap: wrap
+  }
+
+  .student-intake-form {
+    grid-template-columns: 1fr !important
+  }
+
+  .form-progress {
+    position: static !important
+  }
+
+  .profile-grid {
+    grid-template-columns: 1fr
+  }
+
+  .profile-form {
+    grid-template-columns: 1fr
+  }
+
+  .student-create-page {
+    padding: 16px 12px 48px
+  }
+
+  .modal-overlay {
+    padding: 12px
   }
 
   .import-wizard-nav {
@@ -5269,10 +5268,71 @@ tbody tr:hover {
   .profile-identity {
     align-items: flex-start
   }
+}
 
+/* ─── Small mobile: < 460px ───────────────────────────────────────────── */
+@media(max-width:460px) {
   .metrics {
     grid-template-columns: 1fr
   }
+
+  .header-actions .icon-button {
+    display: none
+  }
+
+  .page-title .primary-button {
+    width: 100%
+  }
+}
+
+/* ─── Extra small: < 360px ────────────────────────────────────────────── */
+@media(max-width:360px) {
+  .sidebar {
+    width: 100vw
+  }
+
+  .page {
+    padding: 20px 12px 40px
+  }
+}
+
+/* ─── Modern thin scrollbar ────────────────────────────────────────────── */
+.sidebar-menu::-webkit-scrollbar,
+.workspace-content::-webkit-scrollbar {
+  width: 6px
+}
+
+.sidebar-menu::-webkit-scrollbar-track,
+.workspace-content::-webkit-scrollbar-track {
+  background: transparent
+}
+
+.sidebar-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, .2);
+  border-radius: 3px
+}
+
+.sidebar-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, .35)
+}
+
+.workspace-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 33, 71, .15);
+  border-radius: 3px
+}
+
+.workspace-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 33, 71, .28)
+}
+
+.sidebar-menu,
+.workspace-content {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, .2) transparent
+}
+
+.workspace-content {
+  scrollbar-color: rgba(0, 33, 71, .15) transparent
 }
 
 @media(prefers-reduced-motion:reduce) {
@@ -5290,7 +5350,7 @@ tbody tr:hover {
 .auth-layout {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(420px, .95fr) minmax(420px, 1.05fr);
+  grid-template-columns: minmax(360px, .95fr) minmax(360px, 1.05fr);
   gap: clamp(28px, 5vw, 76px);
   align-items: stretch;
   padding: clamp(22px, 4vw, 56px);
@@ -5528,7 +5588,7 @@ tbody tr:hover {
   font-weight: 800
 }
 
-@media(max-width:980px) {
+@media(max-width:860px) {
   .auth-layout {
     grid-template-columns: 1fr;
     gap: 22px;
