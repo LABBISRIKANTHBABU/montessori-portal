@@ -1,0 +1,314 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MONTESSORI PORTAL — AUTHENTICATION PAGES
+   Premium Login, Forgot Password, Reset, Campus Selection
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Auth Layout ───────────────────────────────────────────────────────── */
+.auth-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--color-navy-900);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Background Pattern */
+.auth-layout::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: linear-gradient(135deg, #000 0%, transparent 50%);
+  pointer-events: none;
+}
+
+/* ─── Auth Hero Panel ───────────────────────────────────────────────────── */
+.auth-hero {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: var(--space-10);
+  position: relative;
+  z-index: 1;
+}
+
+.auth-hero-card {
+  width: min(540px, 100%);
+  padding: var(--space-10);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-3xl);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  backdrop-filter: blur(20px);
+}
+
+.auth-hero .brand {
+  margin-bottom: var(--space-8);
+}
+
+.auth-hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: var(--weight-bold);
+  color: var(--color-white);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  margin-bottom: var(--space-4);
+}
+
+.auth-hero p {
+  font-size: var(--text-md);
+  color: rgba(255, 255, 255, 0.6);
+  line-height: var(--leading-relaxed);
+  margin-bottom: var(--space-8);
+  max-width: 480px;
+}
+
+.auth-hero-features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.auth-feature {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: var(--text-sm);
+}
+
+.auth-feature svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-gold-300);
+  flex-shrink: 0;
+}
+
+/* ─── Auth Panel ────────────────────────────────────────────────────────── */
+.auth-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-10);
+  position: relative;
+  z-index: 1;
+  background: var(--color-surface);
+}
+
+.auth-panel-inner {
+  width: min(440px, 100%);
+  animation: slide-up var(--duration-slower) var(--ease-spring);
+}
+
+/* ─── Auth Form ─────────────────────────────────────────────────────────── */
+.auth-form-header {
+  margin-bottom: var(--space-8);
+}
+
+.auth-form-header h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-bold);
+  color: var(--color-text);
+  margin-bottom: var(--space-2);
+}
+
+.auth-form-header p {
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.auth-form .field-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+}
+
+.auth-form .input {
+  min-height: 48px;
+  border-radius: var(--radius-lg);
+}
+
+.auth-form .btn-primary {
+  width: 100%;
+  min-height: 48px;
+  margin-top: var(--space-2);
+}
+
+.auth-form-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.auth-form-footer a {
+  font-weight: var(--weight-semibold);
+  color: var(--color-primary);
+}
+
+.auth-form-footer a:hover {
+  color: var(--color-primary-hover);
+}
+
+/* Password Visibility Toggle */
+.password-field {
+  position: relative;
+}
+
+.password-toggle {
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: var(--space-2);
+  color: var(--color-text-tertiary);
+  border-radius: var(--radius-md);
+}
+
+.password-toggle:hover {
+  color: var(--color-text-secondary);
+  background: var(--color-gray-100);
+}
+
+/* Remember Me */
+.auth-remember {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.auth-remember input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary);
+}
+
+/* ─── Campus Selection ──────────────────────────────────────────────────── */
+.campus-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.campus-card {
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-default);
+}
+
+.campus-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.campus-card-icon {
+  width: 48px;
+  height: 48px;
+  background: var(--color-primary-light);
+  border-radius: var(--radius-lg);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.campus-card-icon img {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+}
+
+.campus-card-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.campus-card-name {
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  margin-bottom: var(--space-1);
+}
+
+.campus-card-city {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.campus-card-arrow {
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+  transition: transform var(--duration-fast) var(--ease-default);
+}
+
+.campus-card:hover .campus-card-arrow {
+  color: var(--color-primary);
+  transform: translateX(3px);
+}
+
+/* ─── Auth Responsive ───────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .auth-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-hero {
+    display: none;
+  }
+
+  .auth-panel {
+    min-height: 100vh;
+  }
+}
+
+@media (max-width: 768px) {
+  .auth-panel {
+    padding: var(--space-6);
+  }
+
+  .auth-hero-card {
+    padding: var(--space-6);
+  }
+
+  .campus-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-panel {
+    padding: var(--space-4);
+  }
+
+  .auth-panel-inner {
+    width: 100%;
+  }
+
+  .auth-form-header h2 {
+    font-size: var(--text-2xl);
+  }
+}

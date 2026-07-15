@@ -1,0 +1,260 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MONTESSORI PORTAL — DASHBOARD STYLES
+   Role-based Dashboard Layouts
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Dashboard Grid ────────────────────────────────────────────────────── */
+.dashboard-grid {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.dashboard-grid-default {
+  grid-template-columns: 1fr;
+}
+
+.dashboard-grid-2col {
+  grid-template-columns: 2fr 1fr;
+}
+
+/* ─── Metrics Row ───────────────────────────────────────────────────────── */
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 1280px) {
+  .metrics-row { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 1024px) {
+  .metrics-row { grid-template-columns: repeat(2, 1fr); }
+  .dashboard-grid-2col { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .metrics-row { grid-template-columns: 1fr; }
+}
+
+/* ─── Dashboard Card ────────────────────────────────────────────────────── */
+.dash-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  transition: all var(--duration-normal) var(--ease-default);
+}
+
+.dash-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.dash-card-header {
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dash-card-title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+}
+
+.dash-card-body {
+  padding: var(--space-6);
+}
+
+/* ─── Activity Feed ─────────────────────────────────────────────────────── */
+.activity-feed {
+  display: flex;
+  flex-direction: column;
+}
+
+.activity-item {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+}
+
+.activity-icon-success { background: var(--color-success-light); color: var(--color-success); }
+.activity-icon-danger { background: var(--color-danger-light); color: var(--color-danger); }
+.activity-icon-warning { background: var(--color-warning-light); color: var(--color-warning); }
+.activity-icon-info { background: var(--color-info-light); color: var(--color-info); }
+
+.activity-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.activity-text {
+  font-size: var(--text-base);
+  color: var(--color-text);
+  line-height: var(--leading-snug);
+}
+
+.activity-text strong {
+  font-weight: var(--weight-semibold);
+}
+
+.activity-time {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  margin-top: var(--space-1);
+}
+
+/* ─── Quick Actions ─────────────────────────────────────────────────────── */
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+.quick-action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-gray-50);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-default);
+}
+
+.quick-action:hover {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.quick-action-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.quick-action-text {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+}
+
+/* ─── Campus Portfolio (Super Admin) ────────────────────────────────────── */
+.campus-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+.campus-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-default);
+}
+
+.campus-card:hover {
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-navy-200);
+  transform: translateY(-2px);
+}
+
+.campus-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.campus-card-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-gray-100);
+  display: grid;
+  place-items: center;
+}
+
+.campus-card-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.campus-card-name {
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  font-size: var(--text-md);
+}
+
+.campus-card-city {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+.campus-card-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+
+.campus-metric {
+  text-align: center;
+  padding: var(--space-3);
+  background: var(--color-gray-50);
+  border-radius: var(--radius-md);
+}
+
+.campus-metric-value {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.campus-metric-label {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  margin-top: var(--space-1);
+}
+
+@media (max-width: 768px) {
+  .quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .campus-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .campus-card-metrics {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

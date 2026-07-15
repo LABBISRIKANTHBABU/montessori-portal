@@ -1254,7 +1254,7 @@ function ModulePlaceholder({ name }: { name: string }) {
   );
 }
 
-function Brand({ light = false }: { light?: boolean }) {
+export function Brand({ light = false }: { light?: boolean }) {
   return (
     <div className={light ? "brand light" : "brand"}>
       <span className="brand-logo-shell">

@@ -1,0 +1,270 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MONTESSORI PORTAL — DESIGN SYSTEM TOKENS
+   Premium Educational SaaS Design Language
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Playfair+Display:wght@500;600;700&display=swap');
+
+/* ─── Color Primitives ──────────────────────────────────────────────────── */
+:root {
+  /* Navy / Primary */
+  --color-navy-50: #f0f4f8;
+  --color-navy-100: #d9e2ec;
+  --color-navy-200: #bcccdc;
+  --color-navy-300: #9fb3c8;
+  --color-navy-400: #829ab1;
+  --color-navy-500: #627d98;
+  --color-navy-600: #486581;
+  --color-navy-700: #334e68;
+  --color-navy-800: #243b53;
+  --color-navy-900: #102a43;
+  --color-navy-950: #0a1929;
+
+  /* Gold / Accent */
+  --color-gold-50: #fefcf3;
+  --color-gold-100: #fdf4dc;
+  --color-gold-200: #f9e4b7;
+  --color-gold-300: #f5d48a;
+  --color-gold-400: #efc05c;
+  --color-gold-500: #e6a700;
+  --color-gold-600: #c78d00;
+  --color-gold-700: #a07200;
+  --color-gold-800: #7a5700;
+  --color-gold-900: #543c00;
+
+  /* Green / Success */
+  --color-green-50: #f0faf4;
+  --color-green-100: #d1f2df;
+  --color-green-200: #a7e4c0;
+  --color-green-300: #6dd49a;
+  --color-green-400: #3ec97a;
+  --color-green-500: #2e8b57;
+  --color-green-600: #236b43;
+  --color-green-700: #1a5033;
+  --color-green-800: #113624;
+  --color-green-900: #091d14;
+
+  /* Red / Danger */
+  --color-red-50: #fef5f5;
+  --color-red-100: #fde0e0;
+  --color-red-200: #fbbaba;
+  --color-red-300: #f68a8a;
+  --color-red-400: #ef5a5a;
+  --color-red-500: #d9534f;
+  --color-red-600: #b93e3a;
+  --color-red-700: #8e2f2c;
+  --color-red-800: #63201e;
+  --color-red-900: #3b1311;
+
+  /* Amber / Warning */
+  --color-amber-50: #fffbeb;
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #e6a700;
+  --color-amber-600: #d97706;
+  --color-amber-700: #b45309;
+  --color-amber-800: #92400e;
+  --color-amber-900: #78350f;
+
+  /* Blue / Info */
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-200: #bfdbfe;
+  --color-blue-300: #93c5fd;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3a7bd5;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-blue-800: #1e40af;
+  --color-blue-900: #1e3a8a;
+
+  /* Neutral / Gray */
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+
+  /* White */
+  --color-white: #ffffff;
+
+  /* ─── Semantic Colors ─────────────────────────────────────────────────── */
+  --color-primary: var(--color-navy-800);
+  --color-primary-hover: var(--color-navy-900);
+  --color-primary-light: var(--color-navy-50);
+  --color-primary-muted: var(--color-navy-100);
+
+  --color-accent: var(--color-gold-200);
+  --color-accent-hover: var(--color-gold-300);
+  --color-accent-light: var(--color-gold-50);
+
+  --color-success: var(--color-green-500);
+  --color-success-light: var(--color-green-50);
+  --color-success-border: var(--color-green-200);
+
+  --color-danger: var(--color-red-500);
+  --color-danger-light: var(--color-red-50);
+  --color-danger-border: var(--color-red-200);
+
+  --color-warning: var(--color-amber-500);
+  --color-warning-light: var(--color-amber-50);
+  --color-warning-border: var(--color-amber-200);
+
+  --color-info: var(--color-blue-500);
+  --color-info-light: var(--color-blue-50);
+  --color-info-border: var(--color-blue-200);
+
+  /* ─── Surface Colors ──────────────────────────────────────────────────── */
+  --color-bg: var(--color-gold-50);
+  --color-surface: var(--color-white);
+  --color-surface-raised: var(--color-white);
+  --color-surface-overlay: rgba(255, 255, 255, 0.96);
+  --color-surface-sunken: var(--color-gold-100);
+
+  --color-border: rgba(0, 33, 71, 0.1);
+  --color-border-strong: rgba(0, 33, 71, 0.18);
+  --color-border-subtle: rgba(0, 33, 71, 0.06);
+
+  /* ─── Text Colors ─────────────────────────────────────────────────────── */
+  --color-text: var(--color-navy-900);
+  --color-text-secondary: var(--color-navy-600);
+  --color-text-tertiary: var(--color-navy-400);
+  --color-text-inverse: var(--color-white);
+  --color-text-link: var(--color-navy-700);
+  --color-text-link-hover: var(--color-navy-900);
+
+  /* ─── Typography ──────────────────────────────────────────────────────── */
+  --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', monospace;
+
+  /* Type Scale — Major Third (1.25) */
+  --text-xs: 0.6875rem;    /* 11px */
+  --text-sm: 0.75rem;      /* 12px */
+  --text-base: 0.875rem;   /* 14px */
+  --text-md: 1rem;         /* 16px */
+  --text-lg: 1.125rem;     /* 18px */
+  --text-xl: 1.25rem;      /* 20px */
+  --text-2xl: 1.5rem;      /* 24px */
+  --text-3xl: 1.875rem;    /* 30px */
+  --text-4xl: 2.25rem;     /* 36px */
+  --text-5xl: 3rem;        /* 48px */
+  --text-6xl: 3.75rem;     /* 60px */
+
+  /* Font Weights */
+  --weight-light: 300;
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Line Heights */
+  --leading-none: 1;
+  --leading-tight: 1.2;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* Letter Spacing */
+  --tracking-tight: -0.025em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.05em;
+  --tracking-wider: 0.1em;
+
+  /* ─── Spacing Scale ───────────────────────────────────────────────────── */
+  --space-0: 0;
+  --space-1: 0.25rem;    /* 4px */
+  --space-2: 0.5rem;     /* 8px */
+  --space-3: 0.75rem;    /* 12px */
+  --space-4: 1rem;       /* 16px */
+  --space-5: 1.25rem;    /* 20px */
+  --space-6: 1.5rem;     /* 24px */
+  --space-7: 1.75rem;    /* 28px */
+  --space-8: 2rem;       /* 32px */
+  --space-10: 2.5rem;    /* 40px */
+  --space-12: 3rem;      /* 48px */
+  --space-16: 4rem;      /* 64px */
+  --space-20: 5rem;      /* 80px */
+  --space-24: 6rem;      /* 96px */
+
+  /* ─── Border Radius ───────────────────────────────────────────────────── */
+  --radius-none: 0;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+  --radius-full: 9999px;
+
+  /* ─── Shadows ─────────────────────────────────────────────────────────── */
+  --shadow-xs: 0 1px 2px rgba(0, 33, 71, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 33, 71, 0.06), 0 1px 2px rgba(0, 33, 71, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0, 33, 71, 0.06), 0 2px 4px -2px rgba(0, 33, 71, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 33, 71, 0.06), 0 4px 6px -4px rgba(0, 33, 71, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 33, 71, 0.08), 0 8px 10px -6px rgba(0, 33, 71, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 33, 71, 0.16);
+  --shadow-inner: inset 0 2px 4px rgba(0, 33, 71, 0.04);
+  --shadow-focus: 0 0 0 3px rgba(58, 123, 213, 0.2);
+
+  /* ─── Z-Index Scale ───────────────────────────────────────────────────── */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+
+  /* ─── Transitions ─────────────────────────────────────────────────────── */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+
+  /* ─── Layout ──────────────────────────────────────────────────────────── */
+  --sidebar-width: 272px;
+  --sidebar-width-collapsed: 72px;
+  --header-height: 64px;
+  --content-max-width: 1400px;
+  --page-padding: var(--space-6);
+
+  /* ─── Breakpoints (for reference, used in @media) ────────────────────── */
+  /* --bp-xs: 480px;   */
+  /* --bp-sm: 640px;   */
+  /* --bp-md: 768px;   */
+  /* --bp-lg: 1024px;  */
+  /* --bp-xl: 1280px;  */
+  /* --bp-2xl: 1536px; */
+}
+
+/* ─── Dark Theme Tokens ─────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --color-bg: var(--color-navy-950);
+  --color-surface: var(--color-navy-900);
+  --color-surface-raised: var(--color-navy-800);
+  --color-surface-overlay: rgba(16, 42, 67, 0.96);
+  --color-surface-sunken: var(--color-navy-950);
+
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+
+  --color-text: var(--color-gray-100);
+  --color-text-secondary: var(--color-gray-300);
+  --color-text-tertiary: var(--color-gray-500);
+}
