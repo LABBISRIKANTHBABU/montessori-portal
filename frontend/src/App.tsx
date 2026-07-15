@@ -10,6 +10,13 @@ import { api, apiConfigurationError, DashboardData, GroupOverview, School, Searc
 import { ToastProvider } from "./components/Toast";
 import { filterVisibleGroupOverview, orderVisibleSchools } from "./schools/visibleSchools";
 
+// New design system components
+import { LoginPage } from "./components/LoginPage";
+import { SuperAdminDashboard } from "./components/SuperAdminDashboard";
+import { SchoolDashboard } from "./components/SchoolDashboard";
+import { Sidebar } from "./components/Sidebar";
+import { LoadingPage } from "./components/ui";
+
 const StudentCreatePage = React.lazy(() => import("./features/students/StudentCreatePage"));
 const StudentsPage = React.lazy(() => import("./features/students/StudentsPage"));
 const StudentProfilePage = React.lazy(() => import("./features/students/StudentProfilePage"));
@@ -161,8 +168,8 @@ function App() {
         <Suspense fallback={<div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)" }}>Loading...</div>}>
           <Routes>
             <Route path="/" element={<Landing />} />
-            <Route path="/login/:schoolId" element={session ? <Navigate to="/dashboard" /> : <Login onLogin={signIn} isSuperAdmin={false} />} />
-            <Route path="/super-admin" element={session ? <Navigate to="/dashboard" /> : <Login onLogin={signIn} isSuperAdmin={true} />} />
+            <Route path="/login/:schoolId" element={session ? <Navigate to="/dashboard" /> : <LoginPage onLogin={signIn} isSuperAdmin={false} />} />
+            <Route path="/super-admin" element={session ? <Navigate to="/dashboard" /> : <LoginPage onLogin={signIn} isSuperAdmin={true} />} />
             <Route path="/forgot-password" element={session ? <Navigate to="/dashboard" /> : <PasswordRecovery mode="request" />} />
             <Route path="/reset-password" element={session ? <Navigate to="/dashboard" /> : <PasswordRecovery mode="reset" />} />
             <Route path="/*" element={session ? <Portal session={session} onLogout={signOut} /> : <Navigate to="/" />} />
@@ -600,185 +607,127 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
   const typeColors: Record<string, string> = { student: "#002147", event: "#2e8b57", certificate: "#e6a700", receipt: "#3a7bd5", supplier: "#d9534f", user: "#002147" };
 
   return (
-    <div className="portal">
-      <aside className={menu ? "sidebar open" : "sidebar"}>
-        <div className="sidebar-top">
-          <div className="side-brand">
-            <Brand light />
-            <button className="icon-button mobile-only" onClick={() => setMenu(false)}><X /></button>
-          </div>
-          <div className="campus-card">
-            <span className="campus-mark">
-              <img src={GROUP_LOGO} alt="" aria-hidden="true" />
-            </span>
-            <div>
-              <small>{isSuperAdmin ? "OPERATING CAMPUS" : "ASSIGNED CAMPUS"}</small>
-              {isSuperAdmin ? (
-                <select
-                  className="campus-switcher"
-                  aria-label="Operating campus"
-                  value={activeSchool.id}
-                  onChange={event => {
-                    const selected = availableSchools.find(school => school.id === Number(event.target.value));
-                    if (selected) selectCampus(selected);
-                  }}
-                >
-                  {availableSchools.map(school => <option key={school.id} value={school.id}>{school.name}</option>)}
-                </select>
-              ) : <strong>{activeSchool.name}</strong>}
+    <div className="app-shell">
+      <Sidebar
+        session={session}
+        isSuperAdmin={isSuperAdmin}
+        activeSchool={activeSchool}
+        availableSchools={availableSchools}
+        currentModule={current}
+        onSelectCampus={selectCampus}
+        onLogout={onLogout}
+        open={menu}
+        onToggle={() => setMenu(!menu)}
+      />
+      <main className="workspace">
+        <header className="workspace-header">
+          <div className="workspace-header-left">
+            <button className="btn btn-ghost btn-icon mobile-menu-btn" onClick={() => setMenu(true)}><Menu size={18} /></button>
+            <div className="school-context">
+              <img src={GROUP_LOGO} alt="" style={{ width: 20, height: 20, borderRadius: 4, objectFit: "cover" }} />
+              <span className="school-context-name">{activeSchool.name}</span>
             </div>
           </div>
-        </div>
-        <nav className="sidebar-menu">
-          <span className="nav-label">WORKSPACE</span>
-          {visibleNavItems.map(([path, label, Icon]) => (
-            <button key={path} className={current === path ? "active" : ""} onClick={() => { navigate(`/${path}`); setMenu(false); }}>
-              <Icon size={19} /> {label}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="side-user">
-            <span>{session.user.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}</span>
-            <div><strong>{session.user.name}</strong><small>{session.user.role}</small></div>
-            <button onClick={onLogout} title="Sign out"><LogOut size={17} /></button>
-          </div>
-        </div>
-      </aside>
-      {menu && <div className="sidebar-backdrop" onClick={() => setMenu(false)} />}
-      <main className="workspace">
-        <header>
-          <button className="icon-button mobile-only" onClick={() => setMenu(true)}><Menu /></button>
-          <div className="header-search" ref={searchRef} style={{ position: "relative" }}>
-            <Search size={18} />
-            <input
-              placeholder="Search students, events, certificates..."
-              value={searchQuery}
-              onChange={e => handleSearch(e.target.value)}
-              onFocus={() => searchQuery.length >= 2 && setSearchOpen(true)}
-            />
-            {searchOpen && (
-              <div className="search-dropdown" style={{
-                position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4,
-                background: "#fff", border: "1px solid var(--line)", borderRadius: 14,
-                maxHeight: 360, overflowY: "auto", zIndex: 100, boxShadow: "0 8px 32px rgba(0,33,71,.12)"
-              }}>
-                {searchLoading ? (
-                  <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--muted)" }}>Searching...</div>
-                ) : searchResults.length === 0 ? (
-                  <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--muted)" }}>No results found</div>
-                ) : (
-                  <>
-                    {Object.entries(searchResults.reduce((acc, r) => { (acc[r.type] = acc[r.type] || []).push(r); return acc; }, {} as Record<string, SearchResult[]>)).map(([type, items]) => (
+
+          <div className="workspace-header-center">
+            <div className="header-search search-box" ref={searchRef}>
+              <Search size={15} />
+              <input
+                placeholder="Search students, events, certificates..."
+                value={searchQuery}
+                onChange={e => handleSearch(e.target.value)}
+                onFocus={() => searchQuery.length >= 2 && setSearchOpen(true)}
+              />
+              {searchOpen && (
+                <div className="dropdown" style={{ left: 0, right: 0, width: "100%", maxHeight: 360, overflowY: "auto" }}>
+                  {searchLoading ? (
+                    <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-text-tertiary)" }}>
+                      <div className="spinner" style={{ margin: "0 auto 8px" }} /> Searching...
+                    </div>
+                  ) : searchResults.length === 0 ? (
+                    <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-text-tertiary)" }}>No results found</div>
+                  ) : (
+                    Object.entries(searchResults.reduce((acc, r) => { (acc[r.type] = acc[r.type] || []).push(r); return acc; }, {} as Record<string, SearchResult[]>)).map(([type, items]) => (
                       <div key={type}>
-                        <div style={{ padding: "0.5rem 1rem", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{type}s</div>
+                        <div style={{ padding: "8px 16px", fontSize: 10, fontWeight: 700, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{type}s</div>
                         {items.map(item => (
-                          <button key={`${item.type}-${item.id}`} className="search-result-item" style={{
-                            display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "0.6rem 1rem",
-                            background: "none", border: "none", color: "var(--ink)", cursor: "pointer", textAlign: "left"
-                          }} onClick={() => { navigate(`/${item.module}`); setSearchOpen(false); setSearchQuery(""); }}>
-                            <span style={{ width: 32, height: 32, borderRadius: 8, background: `${typeColors[item.type] || "#002147"}22`, color: typeColors[item.type] || "#002147", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                              {(() => { const Ic = moduleIcons[item.module] || Users; return <Ic size={16} />; })()}
+                          <button key={`${item.type}-${item.id}`} className="dropdown-item" onClick={() => { navigate(`/${item.module}`); setSearchOpen(false); setSearchQuery(""); }}>
+                            <span style={{ width: 28, height: 28, borderRadius: 8, background: `${typeColors[item.type] || "#002147"}15`, color: typeColors[item.type] || "#002147", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                              {(() => { const Ic = moduleIcons[item.module] || Users; return <Ic size={14} />; })()}
                             </span>
                             <div style={{ minWidth: 0 }}>
                               <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</div>
-                              <div style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.subtitle}</div>
+                              <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.subtitle}</div>
                             </div>
                           </button>
                         ))}
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="global-school-context">
-            <span className="context-label">Current school</span>
-            {isSuperAdmin ? (
-              <select
-                aria-label="Current school"
-                value={activeSchool.id}
-                onChange={event => {
-                  const selected = availableSchools.find(school => school.id === Number(event.target.value));
-                  if (selected) selectCampus(selected);
-                }}
-              >
-                {availableSchools.map(school => <option key={school.id} value={school.id}>{school.name}</option>)}
-              </select>
-            ) : <strong>{activeSchool.name}</strong>}
-          </div>
-          <div className="academic-context" title="Current academic year">
-            <small>Academic year</small>
-            <select
-              aria-label="Current academic year"
-              value={activeAcademicYear}
-              onChange={event => selectAcademicYear(event.target.value)}
-            >
-              <option value="">All years</option>
-              {academicYears.map(year => <option key={year} value={year}>{year}</option>)}
-            </select>
-          </div>
-          <div className="header-actions">
-            <button className="icon-button" aria-label="Help" title="Help"><CircleHelp size={19} /></button>
-            <div ref={notifRef} style={{ position: "relative" }}>
-              <button className="icon-button alert" aria-label="Notifications" title="Notifications" onClick={() => setNotifOpen(o => !o)} style={{ position: "relative" }}>
-                <Bell size={19} />
-                {unreadCount > 0 && (
-                  <span style={{
-                    position: "absolute", top: 2, right: 2, width: 18, height: 18, borderRadius: "50%",
-                    background: "var(--danger)", color: "#fff", fontSize: 10, fontWeight: 700,
-                    display: "flex", alignItems: "center", justifyContent: "center"
-                  }}>{unreadCount > 9 ? "9+" : unreadCount}</span>
-                )}
-              </button>
-              {notifOpen && (
-                <div style={{
-                  position: "absolute", top: "100%", right: 0, marginTop: 4, width: 340,
-                  background: "#fff", border: "1px solid var(--line)", borderRadius: 14,
-                  maxHeight: 400, overflowY: "auto", zIndex: 100, boxShadow: "0 8px 32px rgba(0,33,71,.12)"
-                }}>
-                  <div style={{ padding: "0.8rem 1rem", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <strong style={{ fontSize: 14, color: "var(--ink)" }}>Notifications</strong>
-                    {unreadCount > 0 && (
-                      <button onClick={markAllRead} style={{ background: "none", border: "none", color: "var(--navy)", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Mark all read</button>
-                    )}
-                  </div>
-                  {notifications.length === 0 ? (
-                    <div style={{ padding: "2rem", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>No notifications</div>
-                  ) : (
-                    notifications.map(n => (
-                      <div key={n.id} style={{
-                        padding: "0.7rem 1rem", borderBottom: "1px solid var(--line)",
-                        background: n.read ? "transparent" : "rgba(0,33,71,.04)",
-                        opacity: n.read ? 0.6 : 1, cursor: "pointer"
-                      }} onClick={() => { if (n.module) navigate(`/${n.module}`); setNotifOpen(false); }}>
-                        <div style={{ fontSize: 13, fontWeight: n.read ? 400 : 600, color: "var(--ink)" }}>{n.title}</div>
-                        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{n.message}</div>
-                        <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>{new Date(n.createdAt).toLocaleString()}</div>
                       </div>
                     ))
                   )}
                 </div>
               )}
             </div>
-            <button className="icon-button" aria-label="Settings" title="Settings" onClick={() => navigate("/settings")}><Settings size={19} /></button>
-            <button className="icon-button future-control" aria-label="Dark mode coming soon" title="Dark mode coming soon"><Moon size={18} /></button>
-            <div className="header-profile" title={`${session.user.name} · ${session.user.role}`}>
-              <span>{session.user.name.split(" ").map(part => part[0]).join("").slice(0, 2).toUpperCase()}</span>
-              <div><strong>{session.user.name}</strong><small>{session.user.role}</small></div>
+          </div>
+
+          <div className="workspace-header-right">
+            {isSuperAdmin && academicYears.length > 0 && (
+              <select
+                className="input select"
+                style={{ maxWidth: 160, minHeight: 36, fontSize: 13, borderRadius: "var(--radius-md)" }}
+                aria-label="Academic year"
+                value={activeAcademicYear}
+                onChange={e => selectAcademicYear(e.target.value)}
+              >
+                <option value="">All years</option>
+                {academicYears.map(year => <option key={year} value={year}>{year}</option>)}
+              </select>
+            )}
+            <div ref={notifRef} style={{ position: "relative" }}>
+              <button className="header-icon-btn" aria-label="Notifications" onClick={() => setNotifOpen(o => !o)}>
+                <Bell size={18} />
+                {unreadCount > 0 && <span className="notification-dot" />}
+              </button>
+              {notifOpen && (
+                <div className="dropdown" style={{ width: 340, maxHeight: 400, overflowY: "auto", right: 0 }}>
+                  <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>Notifications</span>
+                    {unreadCount > 0 && (
+                      <button className="btn btn-ghost btn-sm" onClick={markAllRead}>Mark all read</button>
+                    )}
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: "2rem", textAlign: "center", color: "var(--color-text-tertiary)", fontSize: 13 }}>No notifications</div>
+                  ) : (
+                    notifications.map(n => (
+                      <button
+                        key={n.id}
+                        className="dropdown-item"
+                        style={{ flexDirection: "column", alignItems: "flex-start", opacity: n.read ? 0.6 : 1 }}
+                        onClick={() => { if (n.module) navigate(`/${n.module}`); setNotifOpen(false); }}
+                      >
+                        <span style={{ fontWeight: n.read ? 400 : 600 }}>{n.title}</span>
+                        <span style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>{n.message}</span>
+                        <span style={{ fontSize: 10, color: "var(--color-text-tertiary)" }}>{new Date(n.createdAt).toLocaleString()}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
+            <button className="header-icon-btn" aria-label="Settings" title="Settings" onClick={() => navigate("/settings")}>
+              <Settings size={18} />
+            </button>
           </div>
         </header>
         <div className="workspace-content">
           {!canOpenCurrentModule ? (
             <div className="page">
-              <div className="form-error" role="alert">You do not have permission to open this module.</div>
+              <div className="alert alert-danger" role="alert">You do not have permission to open this module.</div>
             </div>
           ) : <React.Fragment key={`${activeSchool.id}:${current}`}>
             {current === "dashboard" && (isSuperAdmin
               ? <SuperAdminDashboard session={scopedSession} activeSchool={activeSchool} onSelectCampus={selectCampus} />
-              : <Dashboard session={scopedSession} />)}
+              : <SchoolDashboard session={scopedSession} />)}
             {current === "students" && (creatingStudent
               ? <StudentCreatePage school={activeSchool} academicYear={activeAcademicYear} />
               : managingImports ? <ImportPage />
@@ -802,56 +751,7 @@ function Portal({ session, onLogout }: { session: NonNullable<Session>; onLogout
   );
 }
 
-// ─── Super Admin Dashboard ───────────────────────────────────────────────
-// Loads real data from API. No hardcoded statistics.
-
-function SuperAdminDashboard({
-  session, activeSchool, onSelectCampus
-}: {
-  session: NonNullable<Session>;
-  activeSchool: School;
-  onSelectCampus: (school: School, destination?: string) => void;
-}) {
-  const [data, setData] = useState<GroupOverview | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    api.groupOverview()
-      .then(result => setData(filterVisibleGroupOverview(result.data)))
-      .catch(reason => setError(reason instanceof Error ? reason.message : "Group overview could not be loaded."))
-      .finally(() => setLoading(false));
-  }, []);
-
-  return (
-    <div className="page super-command">
-      <div className="page-title command-title">
-        <div>
-          <span className="eyebrow">GROUP CONTROL CENTRE</span>
-          <h1>Every campus.<br />One clear view.</h1>
-          <p>{session.user.name}, you can inspect and operate every active Montessori school.</p>
-        </div>
-        <div className="scope-seal">
-          <Shield size={22} />
-          <div><small>OPERATING NOW</small><strong>{activeSchool.name}</strong><span>{activeSchool.city}</span></div>
-        </div>
-      </div>
-      {error ? <div className="form-error" role="alert">{error}</div> : loading ? (
-        <section className="metrics"><Metric label="Loading..." value="..." note="Fetching group data" icon={Users} /></section>
-      ) : data ? (
-        <>
-          <section className="metrics">
-            <Metric label="Campuses" value={data.totals.schools} note="Active schools" icon={GraduationCap} />
-            <Metric label="Students" value={data.totals.students} note="Across the group" icon={Users} />
-            <Metric label="Fees collected" value={`₹${data.totals.fees.toLocaleString("en-IN")}`} note="All campuses" icon={WalletCards} />
-            <Metric label="Staff accounts" value={data.totals.staff} note="Active users" icon={UserRound} accent />
-          </section>
-          <AccessResponsibilityPanel role="super" />
-          <CampusPortfolio data={data} activeSchoolId={activeSchool.id} onSelectCampus={onSelectCampus} />
-        </>
-      ) : <div className="empty-state">No active campuses are configured.</div>}
-    </div>
-  );
-}
+// ─── Schools Page ───────────────────────────────────────────────────────
 
 function SchoolsPage({
   activeSchoolId, onSelectCampus
@@ -935,300 +835,7 @@ function AccessResponsibilityPanel({ role }: { role: "super" | "school" }) {
 }
 
 // ─── School Dashboard ────────────────────────────────────────────────────
-// Role-based dashboard with extended widgets.
-
-function Dashboard({ session }: { session: NonNullable<Session> }) {
-  const navigate = useNavigate();
-  const [data, setData] = useState<any>(null);
-  const [extData, setExtData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
-  const role = session.user.role;
-
-  useEffect(() => {
-    Promise.allSettled([api.dashboard(), api.dashboardExtended()])
-      .then(([base, ext]) => {
-        if (base.status === "fulfilled") setData(base.value.data);
-        else setLoadError(base.reason instanceof Error ? base.reason.message : "Dashboard data could not be loaded.");
-        if (ext.status === "fulfilled") setExtData(ext.value.data);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  const today = new Date();
-  const dayName = today.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase();
-  const dateStr = today.toLocaleDateString("en-US", { month: "long", day: "numeric" });
-
-  const roleWidgets = getRoleWidgets(role);
-  const quickActions = getQuickActions(role, navigate);
-
-  return (
-    <div className="page">
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">{dayName}, {dateStr}</span>
-          <h1>Welcome, {session.user.name.split(" ")[0]}.</h1>
-          <p>{roleDashboardSubtitle(role)}</p>
-        </div>
-        {quickActions.length > 0 && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {quickActions.map((action, i) => (
-              <button key={i} className="primary-button" onClick={action.onClick} style={{ fontSize: 13 }}>
-                <action.icon size={16} /> {action.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {loadError ? (
-        <div className="form-error" role="alert">{loadError}</div>
-      ) : loading ? (
-        <section className="metrics">
-          <Metric label="Loading..." value="..." note="Fetching data" icon={Users} />
-        </section>
-      ) : (
-        <>
-          <section className="metrics">
-            {roleWidgets.map((w, i) => (
-              <Metric
-                key={i}
-                label={w.label}
-                value={dashboardMetricValue(w, data, extData)}
-                note={w.note}
-                icon={w.icon}
-                accent={w.accent}
-              />
-            ))}
-          </section>
-          {role === "School Admin" && <AccessResponsibilityPanel role="school" />}
-
-          <section className="dashboard-grid">
-            {role !== "Parent" && (
-              <article className="panel activity-panel">
-                <div className="panel-head">
-                  <div><span className="step-label">RECENT ACTIVITY</span><h3>Latest actions</h3></div>
-                </div>
-                <div className="activity-list">
-                  {(extData?.recentActivity || data?.recent || []).slice(0, 8).map((item: any, i: number) => (
-                    <div className="activity" key={i}>
-                      <span className={`activity-icon tone-${i % 3}`}>
-                        {item.module === "students" ? <Users size={17} /> :
-                         item.module === "certificates" ? <FileBadge2 size={17} /> :
-                         item.module === "fees" ? <WalletCards size={17} /> :
-                         item.module === "events" ? <Calendar size={17} /> :
-                         <FileBadge2 size={17} />}
-                      </span>
-                      <div>
-                        <strong>{item.action || item.title}</strong>
-                        <small>{item.detail || item.meta}</small>
-                      </div>
-                      <time>{item.time}</time>
-                    </div>
-                  ))}
-                  {(!extData?.recentActivity && !data?.recent) && <p className="muted" style={{ padding: "2rem", textAlign: "center" }}>No recent activity.</p>}
-                </div>
-              </article>
-            )}
-
-            {extData?.pendingTasks && extData.pendingTasks.length > 0 && (
-              <article className="panel">
-                <div className="panel-head">
-                  <div><span className="step-label">PENDING TASKS</span><h3>Needs attention</h3></div>
-                </div>
-                <div style={{ padding: "0.5rem 1rem" }}>
-                  {extData.pendingTasks.map((task: any) => (
-                    <button key={task.id} style={{
-                      display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "0.7rem 0",
-                      background: "none", border: "none", borderBottom: "1px solid var(--line)",
-                      color: "var(--ink)", cursor: "pointer", textAlign: "left"
-                    }} onClick={() => navigate(`/${task.module}`)}>
-                      <span style={{
-                        width: 32, height: 32, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-                        background: task.count > 0 ? "rgba(217,83,79,.1)" : "rgba(46,139,87,.1)",
-                        color: task.count > 0 ? "var(--danger)" : "var(--success)", flexShrink: 0
-                      }}>
-                        {task.count > 0 ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
-                      </span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{task.task}</div>
-                      </div>
-                      {task.count > 0 && (
-                        <span style={{
-                          background: "rgba(217,83,79,.1)", color: "var(--danger)", padding: "2px 8px", borderRadius: 12,
-                          fontSize: 11, fontWeight: 700
-                        }}>{task.count}</span>
-                      )}
-                      <ArrowRight size={14} style={{ color: "#8b8fa3" }} />
-                    </button>
-                  ))}
-                </div>
-              </article>
-            )}
-
-            {data?.enrollmentByClass && data.enrollmentByClass.length > 0 && (
-              <article className="panel chart-panel">
-                <div className="panel-head">
-                  <div><span className="step-label">ENROLMENT</span><h3>Students by class</h3></div>
-                  <button className="text-button" onClick={() => navigate("/reports")}>View report <ArrowRight size={15} /></button>
-                </div>
-                <div className="bar-chart">
-                  {data.enrollmentByClass.map((item: any) => {
-                    const max = Math.max(...data.enrollmentByClass.map((v: any) => v.value), 1);
-                    return (
-                      <div className="bar-item" key={item.label}>
-                        <span>{item.value}</span>
-                        <i style={{ height: `${Math.max(12, item.value / max * 100)}%` }} />
-                        <small>{item.label}</small>
-                      </div>
-                    );
-                  })}
-                </div>
-              </article>
-            )}
-
-            <QuickActionsPanel role={role} navigate={navigate} />
-          </section>
-        </>
-      )}
-    </div>
-  );
-}
-
-function roleDashboardSubtitle(role: string): string {
-  switch (role) {
-    case "School Admin": return "Full overview of your school operations.";
-    case "Principal": return "Academic overview and key metrics.";
-    case "Office Staff": return "Student and document operations at a glance.";
-    case "Teacher": return "Your class activity and events.";
-    case "Accountant": return "Financial overview and fee collection status.";
-    case "Parent": return "Your children's activity and updates.";
-    default: return "Here's the pulse of your school today.";
-  }
-}
-
-function getRoleWidgets(role: string) {
-  switch (role) {
-    case "School Admin":
-      return [
-        { label: "Students", altKey: "students", note: "All enrolled", icon: Users },
-        { label: "Events", altKey: "events", note: "All school events", icon: Calendar },
-        { label: "Fees", altKey: "fees", note: "Total collected", icon: WalletCards, currency: true },
-        { label: "Certificates", altKey: "certificates", note: "All generated", icon: Award, accent: true },
-      ];
-    case "Principal":
-      return [
-        { label: "Total students", key: "totalStudents", altKey: "students", note: "Enrolled this year", icon: Users },
-        { label: "Active students", key: "activeStudents", altKey: "active", note: "Currently enrolled", icon: UserRound },
-        { label: "Pending certificates", key: "pendingCertificates", altKey: "pendingCertificates", note: "Awaiting approval", icon: FileBadge2 },
-        { label: "Draft events", key: "draftEvents", note: "Not yet published", icon: Calendar },
-      ];
-    case "Office Staff":
-      return [
-        { label: "Total students", key: "totalStudents", altKey: "students", note: "Current year", icon: Users },
-        { label: "Pending certificates", key: "pendingCertificates", altKey: "pendingCertificates", note: "To process", icon: FileBadge2 },
-        { label: "Fees collected today", key: "feesCollectedToday", note: "Daily collection", icon: WalletCards },
-        { label: "Active students", key: "activeStudents", altKey: "active", note: "Currently enrolled", icon: UserRound },
-      ];
-    case "Teacher":
-      return [
-        { label: "Active students", key: "activeStudents", altKey: "active", note: "In your classes", icon: Users },
-        { label: "Upcoming events", key: "draftEvents", note: "This month", icon: Calendar },
-        { label: "Fees collected", key: "feesCollectedToday", note: "Today", icon: WalletCards },
-        { label: "Pending tasks", key: "pendingCertificates", altKey: "pendingCertificates", note: "Action needed", icon: Clock },
-      ];
-    case "Accountant":
-      return [
-        { label: "Fees collected today", key: "feesCollectedToday", note: "Daily collection", icon: WalletCards },
-        { label: "Pending payments", key: "unpaidFees", note: "Students with dues", icon: CreditCard, accent: true },
-        { label: "Total students", key: "totalStudents", altKey: "students", note: "All enrolled", icon: Users },
-        { label: "Active students", key: "activeStudents", altKey: "active", note: "Currently active", icon: UserRound },
-      ];
-    case "Parent":
-      return [
-        { label: "My children", key: "totalStudents", altKey: "students", note: "Enrolled", icon: Users },
-        { label: "Fees pending", key: "unpaidFees", note: "Outstanding", icon: WalletCards },
-        { label: "Certificates", key: "pendingCertificates", altKey: "pendingCertificates", note: "Available", icon: FileBadge2 },
-        { label: "Events", key: "draftEvents", note: "Upcoming", icon: Calendar },
-      ];
-    default:
-      return [
-        { label: "Total students", key: "totalStudents", altKey: "students", note: "Across current year", icon: Users },
-        { label: "Active students", key: "activeStudents", altKey: "active", note: "Currently enrolled", icon: UserRound },
-        { label: "Campuses", key: "schools", altKey: "schools", note: "All systems online", icon: GraduationCap },
-        { label: "TC requests", key: "pendingCertificates", altKey: "pendingCertificates", note: "Awaiting approval", icon: Award, accent: true },
-      ];
-  }
-}
-
-function dashboardMetricValue(widget: { key?: string; altKey?: string; currency?: boolean }, data: any, extData: any) {
-  const value = (widget.key ? extData?.[widget.key] : undefined)
-    ?? (widget.altKey ? data?.totals?.[widget.altKey] : undefined)
-    ?? 0;
-  return widget.currency ? `₹${Number(value).toLocaleString("en-IN")}` : value;
-}
-
-function getQuickActions(role: string, navigate: any) {
-  const actions: { label: string; icon: typeof Users; onClick: () => void }[] = [];
-  if (["School Admin", "Office Staff", "Principal"].includes(role)) {
-    actions.push({ label: "Add Student", icon: Plus, onClick: () => navigate("/students/new") });
-  }
-  if (["School Admin", "Principal", "Office Staff"].includes(role)) {
-    actions.push({ label: "Create Event", icon: Calendar, onClick: () => navigate("/events") });
-  }
-  if (["School Admin", "Accountant", "Office Staff"].includes(role)) {
-    actions.push({ label: "Record Payment", icon: WalletCards, onClick: () => navigate("/fees") });
-  }
-  if (["School Admin", "Office Staff"].includes(role)) {
-    actions.push({ label: "Issue Certificate", icon: FileBadge2, onClick: () => navigate("/certificates") });
-  }
-  return actions;
-}
-
-function QuickActionsPanel({ role, navigate }: { role: string; navigate: any }) {
-  const actions: { label: string; desc: string; icon: typeof Users; path: string; color: string }[] = [];
-
-  if (["School Admin", "Office Staff", "Principal"].includes(role)) {
-    actions.push({ label: "Add Student", desc: "New admission", icon: Users, path: "/students/new", color: "#002147" });
-  }
-  if (["School Admin", "Principal", "Office Staff"].includes(role)) {
-    actions.push({ label: "Create Event", desc: "Plan event", icon: Calendar, path: "/events", color: "#2e8b57" });
-  }
-  if (["School Admin", "Accountant", "Office Staff"].includes(role)) {
-    actions.push({ label: "Record Payment", desc: "Collect fee", icon: WalletCards, path: "/fees", color: "#3a7bd5" });
-  }
-  if (["School Admin", "Office Staff"].includes(role)) {
-    actions.push({ label: "Issue Certificate", desc: "Generate TC", icon: FileBadge2, path: "/certificates", color: "#e6a700" });
-  }
-  if (["School Admin", "Teacher"].includes(role)) {
-    actions.push({ label: "View Reports", desc: "Analytics", icon: BarChart3, path: "/reports", color: "#d9534f" });
-  }
-
-  if (actions.length === 0) return null;
-
-  return (
-    <article className="panel">
-      <div className="panel-head">
-        <div><span className="step-label">QUICK ACTIONS</span><h3>Shortcuts</h3></div>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, padding: "0.75rem 1rem" }}>
-        {actions.map((a, i) => (
-          <button key={i} onClick={() => navigate(a.path)} style={{
-            display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-            padding: "1rem 0.5rem", background: "#fff", border: "1px solid var(--line)",
-            borderRadius: 10, cursor: "pointer", color: "var(--ink)", transition: "border-color 0.15s"
-          }} onMouseEnter={e => (e.currentTarget.style.borderColor = a.color)} onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--line)")}>
-            <span style={{ width: 36, height: 36, borderRadius: 10, background: `${a.color}15`, color: a.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <a.icon size={18} />
-            </span>
-            <span style={{ fontSize: 12, fontWeight: 700 }}>{a.label}</span>
-            <span style={{ fontSize: 10, color: "var(--muted)" }}>{a.desc}</span>
-          </button>
-        ))}
-      </div>
-    </article>
-  );
-}
+// ─── Utility Components ─────────────────────────────────────────────────
 
 function Metric({ label, value, note, icon: Icon, accent = false }: { label: string; value: string | number; note: string; icon: typeof Users; accent?: boolean }) {
   return (
