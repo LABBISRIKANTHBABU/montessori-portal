@@ -269,7 +269,6 @@ function AuthLayout({
 function Landing() {
   const navigate = useNavigate();
   const [schools, setSchools] = useState<School[]>([]);
-  const [search, setSearch] = useState("");
   const [loadError, setLoadError] = useState(apiConfigurationError);
   useEffect(() => {
     api.schools().then(r => {
@@ -278,13 +277,6 @@ function Landing() {
     })
       .catch(reason => setLoadError(reason instanceof Error ? reason.message : "Schools could not be loaded."));
   }, []);
-
-  const normalizedSearch = search.trim().toLowerCase();
-  const filtered = schools.filter(s =>
-    String(s.name || "").toLowerCase().includes(normalizedSearch) ||
-    String(s.city || "").toLowerCase().includes(normalizedSearch) ||
-    String(s.code || "").toLowerCase().includes(normalizedSearch)
-  );
 
   return (
     <main className="landing-new">
@@ -300,21 +292,12 @@ function Landing() {
         <h1>Select your campus</h1>
         <p>Choose your school to sign in to your workspace.</p>
         <ApiConnectionStatus />
-        <div className="search-bar-large">
-          <Search size={20} />
-          <input
-            type="text"
-            placeholder="Search by school name, city, or code..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
       </section>
 
       <section className="school-grid">
         {loadError && <div className="form-error" role="alert">{loadError}</div>}
-        {filtered.map(school => (
-          <button key={school.id} className="school-card" onClick={() => navigate(`/login/${school.id}`)}>
+        {schools.map((school, i) => (
+          <button key={school.id} className="school-card" style={{ animationDelay: `${i * 60}ms` }} onClick={() => navigate(`/login/${school.id}`)}>
             <div className="school-icon">
               <img src={GROUP_LOGO} alt="" aria-hidden="true" />
             </div>
@@ -325,18 +308,12 @@ function Landing() {
             <ArrowRight size={20} className="card-arrow" />
           </button>
         ))}
-        {filtered.length === 0 && (
-          <div className="empty-state">
-            <Search size={32} />
-            <p>No schools found matching "{search}"</p>
-          </div>
-        )}
       </section>
 
-      <div className="landing-foot">
+      <footer className="landing-foot">
         <span>Montessori Group of Schools</span>
         <span>ERP Platform v1.0</span>
-      </div>
+      </footer>
     </main>
   );
 }
