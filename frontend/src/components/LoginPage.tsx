@@ -1,7 +1,7 @@
 import React, { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowRight, Eye, EyeOff, Shield, CheckCircle2, Clock, AlertTriangle, Lock, Mail, GraduationCap } from "lucide-react";
-import { api, School } from "../api";
+import { api, token, School } from "../api";
 import { orderVisibleSchools } from "../schools/visibleSchools";
 import { Brand } from "../App";
 
@@ -76,6 +76,7 @@ export function LoginPage({ onLogin, isSuperAdmin }: LoginPageProps) {
     setLoading(true);
     try {
       const result = await api.login({ schoolId: isSuperAdmin ? 0 : numericSchoolId, email, password });
+      token.set(result.token);
       onLogin({ user: result.user, school: result.school });
       navigate("/dashboard");
     } catch (err) {

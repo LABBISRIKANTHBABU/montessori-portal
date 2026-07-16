@@ -132,6 +132,7 @@ function App() {
     const raw = localStorage.getItem("monte_session");
     return raw ? JSON.parse(raw) : null;
   });
+  const [sessionError, setSessionError] = useState("");
   useEffect(() => {
     if (!session || (session.user.permissions?.length && session.user.roleCode)) return;
     api.accessModel().then(({ data }) => {
@@ -146,9 +147,11 @@ function App() {
       schoolScope.clear();
       localStorage.removeItem("monte_session");
       setSession(null);
+      setSessionError("Your session has expired. Please log in again.");
     });
   }, [session]);
-  const signIn = (next: NonNullable<Session>) => {
+  const signIn = (next: NonNullable<Session>, jwtToken?: string) => {
+    if (jwtToken) token.set(jwtToken);
     if (next.user.role === "Group Super Admin") schoolScope.set(next.school.id);
     else schoolScope.clear();
     setSession(next);
@@ -167,7 +170,7 @@ function App() {
       <ToastProvider>
         <Suspense fallback={<div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)" }}>Loading...</div>}>
           <Routes>
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<Landing sessionError={sessionError} />} />
             <Route path="/login/:schoolId" element={session ? <Navigate to="/dashboard" /> : <LoginPage onLogin={signIn} isSuperAdmin={false} />} />
             <Route path="/super-admin" element={session ? <Navigate to="/dashboard" /> : <LoginPage onLogin={signIn} isSuperAdmin={true} />} />
             <Route path="/forgot-password" element={session ? <Navigate to="/dashboard" /> : <PasswordRecovery mode="request" />} />
@@ -273,7 +276,7 @@ function AuthLayout({
   );
 }
 
-function Landing() {
+function Landing({ sessionError }: { sessionError?: string }) {
   const navigate = useNavigate();
   const [schools, setSchools] = useState<School[]>([]);
   const [loadError, setLoadError] = useState(apiConfigurationError);
@@ -302,6 +305,7 @@ function Landing() {
       </section>
 
       <section className="school-grid">
+        {sessionError && <div className="form-error" role="alert" style={{ marginBottom: "var(--space-4)" }}>{sessionError}</div>}
         {loadError && <div className="form-error" role="alert">{loadError}</div>}
         {schools.map((school, i) => (
           <button key={school.id} className="school-card" style={{ animationDelay: `${i * 60}ms` }} onClick={() => navigate(`/login/${school.id}`)}>
