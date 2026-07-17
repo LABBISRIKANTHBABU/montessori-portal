@@ -1,9 +1,20 @@
-import React, { FormEvent, useEffect, useState } from "react";
+import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowRight, Eye, EyeOff, Shield, CheckCircle2, Clock, AlertTriangle, Lock, Mail, GraduationCap } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Building2,
+  CheckCircle2,
+  Clock,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  Shield,
+  Sparkles,
+} from "lucide-react";
 import { api, token, School } from "../api";
 import { orderVisibleSchools } from "../schools/visibleSchools";
-import { Brand } from "../App";
 
 const GROUP_LOGO = "/montessori-golden-jubilee-logo.jpeg";
 
@@ -18,7 +29,7 @@ function ConnectionStatus() {
         if (cancelled) return;
         if (result.checks?.database === false || result.database?.ok === false) {
           setState("degraded");
-          setMessage("Database degraded");
+          setMessage("Database connection degraded");
           return;
         }
         setState("online");
@@ -33,11 +44,10 @@ function ConnectionStatus() {
   }, []);
 
   const Icon = state === "online" ? CheckCircle2 : state === "checking" ? Clock : AlertTriangle;
-  const color = state === "online" ? "var(--color-success)" : state === "degraded" ? "var(--color-warning)" : "var(--color-danger)";
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color }}>
-      <Icon size={13} />
+    <div className={`login-status login-status-${state}`} role="status" aria-live="polite">
+      <Icon size={14} />
       <span>{message || "Checking connection..."}</span>
     </div>
   );
@@ -59,19 +69,19 @@ export function LoginPage({ onLogin, isSuperAdmin }: LoginPageProps) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [targetSchool, setTargetSchool] = useState<School | null>(null);
-  const [schools, setSchools] = useState<School[]>([]);
 
   useEffect(() => {
     if (isSuperAdmin) return;
-    api.schools().then(({ data }) => {
-      const visible = orderVisibleSchools(data);
-      setSchools(visible);
-      setTargetSchool(visible.find((s) => s.id === numericSchoolId) || null);
-    }).catch(() => undefined);
+    api.schools()
+      .then(({ data }) => {
+        const visible = orderVisibleSchools(data);
+        setTargetSchool(visible.find((school) => school.id === numericSchoolId) || null);
+      })
+      .catch(() => undefined);
   }, [isSuperAdmin, numericSchoolId]);
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
     setError("");
     setLoading(true);
     try {
@@ -90,140 +100,142 @@ export function LoginPage({ onLogin, isSuperAdmin }: LoginPageProps) {
   const subtitle = isSuperAdmin
     ? "Group-wide access for campus governance, approvals, reports, and operations."
     : `${targetSchool?.city || "Campus"} portal for school administration, teachers, and staff.`;
-
-  const supportedRoles = ["Super Admin", "School Admin", "Teacher", "Accountant", "Reception"];
+  const eyebrow = isSuperAdmin ? "GLOBAL PLATFORM ACCESS" : "SECURE CAMPUS ACCESS";
+  const formTitle = isSuperAdmin ? "Welcome back, Super Admin" : "Welcome back";
+  const roleBadge = isSuperAdmin ? "Super Admin" : "School Workspace";
+  const highlights = useMemo(
+    () => isSuperAdmin
+      ? ["All campuses", "Approvals", "Reports", "Governance"]
+      : ["Students", "Attendance", "Certificates", "Fees"],
+    [isSuperAdmin],
+  );
 
   return (
-    <main className="auth-layout">
-      {/* Hero Panel */}
-      <section className="auth-hero">
-        <div className="auth-hero-card">
-          <div className="brand" style={{ marginBottom: "var(--space-8)" }}>
-            <span className="brand-logo-shell" style={{ width: 40, height: 40 }}>
-              <img src={GROUP_LOGO} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 10 }} />
+    <main className="login-screen">
+      <button className="login-back-button" onClick={() => navigate("/")}>
+        <ArrowRight size={14} />
+        Back to schools
+      </button>
+
+      <section className="login-brand-panel" aria-label="Montessori portal introduction">
+        <div className="login-brand-card">
+          <div className="login-brand-top">
+            <span className="login-logo-lockup">
+              <img src={GROUP_LOGO} alt="Montessori logo" />
             </span>
             <div>
-              <strong style={{ fontSize: 18 }}>Montessori</strong>
-              <small style={{ fontSize: 9, letterSpacing: "0.2em", opacity: 0.5 }}>SCHOOL PORTAL</small>
+              <strong>Montessori</strong>
+              <small>GROUP OF SCHOOLS</small>
             </div>
           </div>
 
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "rgba(249, 228, 183, 0.12)", border: "1px solid rgba(249, 228, 183, 0.25)", borderRadius: 999, fontSize: 11, fontWeight: 700, color: "#f9e4b7", letterSpacing: "0.08em", marginBottom: "var(--space-6)" }}>
-            <Shield size={13} />
-            {isSuperAdmin ? "SUPER ADMIN" : "SCHOOL WORKSPACE"}
+          <span className="login-role-pill">
+            {isSuperAdmin ? <Shield size={14} /> : <Building2 size={14} />}
+            {roleBadge}
+          </span>
+
+          <div className="login-brand-copy">
+            <span>{eyebrow}</span>
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
           </div>
 
-          <h1>{title}</h1>
-          <p>{subtitle}</p>
-
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: "var(--space-8)" }}>
-            {supportedRoles.map((role) => (
-              <span key={role} style={{ padding: "7px 12px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 999, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: 600 }}>
-                {role}
+          <div className="login-feature-row">
+            {highlights.map((item) => (
+              <span key={item}>
+                <Sparkles size={13} />
+                {item}
               </span>
             ))}
           </div>
-
-          <blockquote style={{ margin: 0, padding: "20px 0 0", borderTop: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.55)", fontSize: 14, lineHeight: 1.7 }}>
-            "The education of even a small child does not aim at preparing him for school, but for life."
-            <cite style={{ display: "block", marginTop: 10, color: "#f9e4b7", fontStyle: "normal", fontWeight: 700 }}>— Maria Montessori</cite>
-          </blockquote>
         </div>
       </section>
 
-      {/* Login Panel */}
-      <section className="auth-panel">
-        <div className="auth-panel-inner">
-          <button
-            className="auth-back-link"
-            onClick={() => navigate("/")}
-          >
-            <ArrowRight size={14} style={{ transform: "rotate(180deg)" }} /> Back to schools
-          </button>
-
-          <div className="auth-form-header" style={{ marginTop: "var(--space-8)" }}>
-            <span className="eyebrow" style={{ color: "var(--color-text-tertiary)", marginBottom: "var(--space-3)", display: "block" }}>
-              {isSuperAdmin ? "GLOBAL PLATFORM ACCESS" : "SECURE CAMPUS ACCESS"}
-            </span>
-            <h2>{isSuperAdmin ? "Sign in to command centre" : "Sign in to your school"}</h2>
-            <p style={{ color: "var(--color-text-secondary)", marginTop: "var(--space-2)", lineHeight: 1.6 }}>
-              Use your official staff credentials. Sessions are protected and school-scoped.
-            </p>
+      <section className="login-form-panel" aria-label="Sign in form">
+        <div className="login-card">
+          <div className="login-card-header">
+            <div className="login-card-logo">
+              <img src={GROUP_LOGO} alt="Montessori logo" />
+            </div>
+            <span>{eyebrow}</span>
+            <h2>{formTitle}</h2>
+            <p>Use your official staff credentials to continue to the Montessori ERP workspace.</p>
           </div>
 
           <ConnectionStatus />
 
-          <form className="auth-form" onSubmit={handleSubmit} style={{ marginTop: "var(--space-6)" }}>
-            <div className="field">
-              <label className="field-label">Email address</label>
-              <div style={{ position: "relative" }}>
-                <Mail size={16} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--color-text-tertiary)" }} />
+          <form className="login-form" onSubmit={handleSubmit}>
+            <div className="login-field">
+              <label>Email address</label>
+              <div className="login-input-wrap">
+                <Mail size={17} />
                 <input
                   type="email"
-                  className="input"
-                  style={{ paddingLeft: 40 }}
                   placeholder="you@school.edu"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(event) => setEmail(event.target.value)}
                   required
                   autoComplete="email"
                 />
               </div>
             </div>
 
-            <div className="field">
-              <label className="field-label">Password</label>
-              <div style={{ position: "relative" }}>
-                <Lock size={16} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--color-text-tertiary)" }} />
+            <div className="login-field">
+              <label>Password</label>
+              <div className="login-input-wrap">
+                <Lock size={17} />
                 <input
                   type={showPassword ? "text" : "password"}
-                  className="input"
-                  style={{ paddingLeft: 40, paddingRight: 44 }}
                   placeholder="Enter your password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(event) => setPassword(event.target.value)}
                   required
                   autoComplete="current-password"
                 />
                 <button
                   type="button"
+                  className="login-password-toggle"
                   onClick={() => setShowPassword(!showPassword)}
-                  style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", padding: 6, color: "var(--color-text-tertiary)", borderRadius: "var(--radius-md)" }}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", background: "var(--color-danger-light)", border: "1px solid var(--color-danger-border)", borderRadius: "var(--radius-lg)", color: "var(--color-red-700)", fontSize: 13 }}>
-                <AlertTriangle size={15} />
-                {error}
+              <div className="login-error" role="alert">
+                <AlertTriangle size={16} />
+                <span>{error}</span>
               </div>
             )}
 
-            <button type="submit" className="btn btn-primary btn-lg" style={{ width: "100%", marginTop: "var(--space-2)" }} disabled={loading}>
+            <button type="submit" className="login-submit" disabled={loading}>
               {loading ? (
-                <><span className="spinner" /> Signing in...</>
+                <>
+                  <span className="spinner" />
+                  Signing in...
+                </>
               ) : (
-                <>Sign in securely <ArrowRight size={16} /></>
+                <>
+                  Sign in securely
+                  <ArrowRight size={18} />
+                </>
               )}
             </button>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-2)" }}>
-              <button
-                type="button"
-                onClick={() => navigate(`/forgot-password?schoolId=${numericSchoolId}&email=${encodeURIComponent(email)}`)}
-                style={{ background: "none", border: "none", color: "var(--color-primary)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
-              >
-                Forgot password?
-              </button>
-            </div>
+            <button
+              type="button"
+              className="login-forgot-button"
+              onClick={() => navigate(`/forgot-password?schoolId=${numericSchoolId}&email=${encodeURIComponent(email)}`)}
+            >
+              Forgot password?
+            </button>
           </form>
 
-          <footer style={{ marginTop: "var(--space-10)", paddingTop: "var(--space-5)", borderTop: "1px solid var(--color-border-subtle)", display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--color-text-tertiary)", fontWeight: 600 }}>
+          <footer className="login-footer">
             <span>Montessori Group ERP</span>
-            <span>Secure school portal</span>
+            <span>Protected school portal</span>
           </footer>
         </div>
       </section>
